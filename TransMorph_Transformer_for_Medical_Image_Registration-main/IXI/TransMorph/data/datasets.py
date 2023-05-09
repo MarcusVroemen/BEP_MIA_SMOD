@@ -1,10 +1,11 @@
 import os, glob
 import torch, sys
 from torch.utils.data import Dataset
-from .data_utils import pkload
+from data.data_utils import pkload #!removed .
 import matplotlib.pyplot as plt
-
+from data import trans
 import numpy as np
+from torchvision import transforms
 
 
 class IXIBrainDataset(Dataset):
@@ -36,12 +37,13 @@ class IXIBrainDataset(Dataset):
         #sys.exit(0)
         x = np.ascontiguousarray(x)# [Bsize,channelsHeight,,Width,Depth]
         y = np.ascontiguousarray(y)
-        #plt.figure()
-        #plt.subplot(1, 2, 1)
-        #plt.imshow(x[0, :, :, 8], cmap='gray')
-        #plt.subplot(1, 2, 2)
-        #plt.imshow(y[0, :, :, 8], cmap='gray')
-        #plt.show()
+        
+        # plt.figure()
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(x[0, :, :, 100], cmap='gray')
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(y[0, :, :, 100], cmap='gray')
+        # plt.show()
         #sys.exit(0)
         #y = np.squeeze(y, axis=0)
         x, y = torch.from_numpy(x), torch.from_numpy(y)
@@ -75,8 +77,34 @@ class IXIBrainInferDataset(Dataset):
         y = np.ascontiguousarray(y)
         x_seg = np.ascontiguousarray(x_seg)  # [Bsize,channelsHeight,,Width,Depth]
         y_seg = np.ascontiguousarray(y_seg)
+        
+        # plt.figure()
+        # plt.subplot(2, 2, 1)
+        # plt.imshow(x[0, :, :, 150], cmap='gray')
+        # plt.subplot(2, 2, 2)
+        # plt.imshow(y[0, :, :, 150], cmap='gray')
+        # plt.subplot(2, 2, 3)
+        # plt.imshow(x_seg[0, :, :, 150], cmap='gray')
+        # plt.subplot(2, 2, 4)
+        # plt.imshow(y_seg[0, :, :, 150], cmap='gray')
+        # plt.show()
+        
         x, y, x_seg, y_seg = torch.from_numpy(x), torch.from_numpy(y), torch.from_numpy(x_seg), torch.from_numpy(y_seg)
         return x, y, x_seg, y_seg
 
     def __len__(self):
         return len(self.paths)
+    
+
+# atlas_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/atlas.pkl'
+# train_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/Train/'
+# val_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/Val/'
+
+# train_composed = transforms.Compose([trans.RandomFlip(0),
+#                                         trans.NumpyType((np.float32, np.float32)),])
+# val_composed = transforms.Compose([trans.Seg_norm(), #rearrange segmentation label to 1 to 46
+#                                     trans.NumpyType((np.float32, np.int16))])
+# train_set = IXIBrainDataset(glob.glob(train_dir + '*.pkl'), atlas_dir, transforms=train_composed)
+# val_set = IXIBrainInferDataset(glob.glob(val_dir + '*.pkl'), atlas_dir, transforms=val_composed)
+# # train_set[1]
+# val_set[1]

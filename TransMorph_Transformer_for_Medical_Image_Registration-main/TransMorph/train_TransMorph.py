@@ -27,8 +27,13 @@ class Logger(object):
 
 def main():
     batch_size = 1
-    train_dir = 'D:/DATA/JHUBrain/Train/'
-    val_dir = 'D:/DATA/JHUBrain/Val/'
+    # train_dir = 'D:/DATA/JHUBrain/Train/'
+    # val_dir = 'D:/DATA/JHUBrain/Val/'
+    
+    #TODO 4DCT data
+    # train_dir = '/BEP_MIA_DIR/4DCT/train/'
+    # val_dir = '/BEP_MIA_DIR/4DCT/val/'
+    
     weights = [1, 0.02] # loss weights
     save_dir = 'TransMorph_mse_{}_diffusion_{}/'.format(weights[0], weights[1])
     if not os.path.exists('experiments/'+save_dir):
@@ -217,7 +222,7 @@ if __name__ == '__main__':
     '''
     GPU configuration
     '''
-    GPU_iden = 1
+    GPU_iden = 0
     GPU_num = torch.cuda.device_count()
     print('Number of GPU: ' + str(GPU_num))
     for GPU_idx in range(GPU_num):

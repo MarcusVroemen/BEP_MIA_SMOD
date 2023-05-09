@@ -27,10 +27,14 @@ class Logger(object):
 
 def main():
     batch_size = 1
-    atlas_dir = 'Path_to_IXI_data/atlas.pkl'
-    train_dir = 'Path_to_IXI_data/Train/'
-    val_dir = 'Path_to_IXI_data/Val/'
-    weights = [1, 1] # loss weights
+    # train_dir = 'Path_to_IXI_data/Train/'
+    # val_dir = 'Path_to_IXI_data/Val/'
+    # atlas_dir = 'Path_to_IXI_data/atlas.pkl'
+    atlas_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/atlas.pkl'
+    train_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/Train/'
+    val_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/Val/'
+    
+    weights = [1, 1] # loss weights #!
     save_dir = 'TransMorph_ncc_{}_diffusion_{}/'.format(weights[0], weights[1])
     if not os.path.exists('experiments/'+save_dir):
         os.makedirs('experiments/'+save_dir)
@@ -74,11 +78,11 @@ def main():
     Initialize training
     '''
     train_composed = transforms.Compose([trans.RandomFlip(0),
-                                         trans.NumpyType((np.float32, np.float32)),
-                                         ])
-
+                                        trans.NumpyType((np.float32, np.float32)),
+                                        transforms.Resize((48,48))]) #!
     val_composed = transforms.Compose([trans.Seg_norm(), #rearrange segmentation label to 1 to 46
-                                       trans.NumpyType((np.float32, np.int16))])
+                                        trans.NumpyType((np.float32, np.int16)),
+                                        transforms.Resize((48,48))]) #!
     train_set = datasets.IXIBrainDataset(glob.glob(train_dir + '*.pkl'), atlas_dir, transforms=train_composed)
     val_set = datasets.IXIBrainInferDataset(glob.glob(val_dir + '*.pkl'), atlas_dir, transforms=val_composed)
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
@@ -201,7 +205,7 @@ if __name__ == '__main__':
     '''
     GPU configuration
     '''
-    GPU_iden = 1
+    GPU_iden = 0
     GPU_num = torch.cuda.device_count()
     print('Number of GPU: ' + str(GPU_num))
     for GPU_idx in range(GPU_num):
