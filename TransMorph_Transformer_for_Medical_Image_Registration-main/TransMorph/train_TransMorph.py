@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 from natsort import natsorted
 from models.TransMorph import CONFIGS as CONFIGS_TM
 import models.TransMorph as TransMorph
+import datetime
+
 
 class Logger(object):
     def __init__(self, save_dir):
@@ -29,10 +31,10 @@ def main():
     batch_size = 1
     # train_dir = 'D:/DATA/JHUBrain/Train/'
     # val_dir = 'D:/DATA/JHUBrain/Val/'
-    
-    #TODO 4DCT data
-    # train_dir = '/BEP_MIA_DIR/4DCT/train/'
-    # val_dir = '/BEP_MIA_DIR/4DCT/val/'
+
+    train_dir = '/home/bme001/20203531/BEP_MIA/BEP_MIA_DIR/IXI_data/Train/'
+    val_dir = '/home/bme001/20203531/BEP_MIA/BEP_MIA_DIR/IXI_data/Val/'
+
     
     weights = [1, 0.02] # loss weights
     save_dir = 'TransMorph_mse_{}_diffusion_{}/'.format(weights[0], weights[1])
@@ -43,16 +45,16 @@ def main():
     sys.stdout = Logger('logs/'+save_dir)
     lr = 0.0001 # learning rate
     epoch_start = 0
-    max_epoch = 500 #max traning epoch
-    cont_training = False #if continue training
-
+    max_epoch = 2 #!max traning epoch
+    cont_training = True #!if continue training
+    print("1")
     '''
     Initialize model
     '''
     config = CONFIGS_TM['TransMorph']
     model = TransMorph.TransMorph(config)
     model.cuda()
-
+    print("2")
     '''
     Initialize spatial transformation function
     '''
@@ -60,6 +62,7 @@ def main():
     reg_model.cuda()
     reg_model_bilin = utils.register_model(config.img_size, 'bilinear')
     reg_model_bilin.cuda()
+    print("3")
 
     '''
     If continue from previous training
@@ -73,6 +76,7 @@ def main():
         model.load_state_dict(best_model)
     else:
         updated_lr = lr
+    print("4")
 
     '''
     Initialize training
@@ -219,6 +223,9 @@ def save_checkpoint(state, save_dir='models', filename='checkpoint.pth.tar', max
         model_lists = natsorted(glob.glob(save_dir + '*'))
 
 if __name__ == '__main__':
+    now = datetime.datetime.now()
+    print(now.strftime("Train TransMorph   %Y-%m-%d %H:%M\n"))
+    
     '''
     GPU configuration
     '''
