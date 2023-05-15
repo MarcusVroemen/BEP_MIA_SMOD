@@ -49,7 +49,7 @@ def main():
     sys.stdout = Logger('logs/'+save_dir)
     lr = 0.0001 # learning rate
     epoch_start = 0
-    max_epoch = 20 #max traning epoch
+    max_epoch = 5 #max traning epoch
     cont_training = False #if continue training
 
     '''
