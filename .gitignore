@@ -1,3 +1,5 @@
+<<<<<<< HEAD
+=======
 /4DCT/
 /IXI_data/
 *.run
@@ -6,3 +8,4 @@
 /gpu_server/
 /TransMorph_Transformer_for_Medical_Image_Registration-main/
 
+>>>>>>> 2c2cab03cd6e04f4ccd76475c2c2b6954b9c74ee
