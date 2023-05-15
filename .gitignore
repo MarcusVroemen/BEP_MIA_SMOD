@@ -1,11 +1,10 @@
-<<<<<<< HEAD
-=======
-/4DCT/
-/IXI_data/
-*.run
-
-/IXI_data/
-/gpu_server/
-/TransMorph_Transformer_for_Medical_Image_Registration-main/
-
->>>>>>> 2c2cab03cd6e04f4ccd76475c2c2b6954b9c74ee
+IXI_data/
+gpu_server/
+experiments/
+logs/
+gryds/
+RegNet/
+!/TransMorph_Transformer_for_Medical_Image_Registration-main/4DCT/
+/TransMorph_Transformer_for_Medical_Image_Registration-main/4DCT/TransMorph/logs/
+/TransMorph_Transformer_for_Medical_Image_Registration-main/4DCT/TransMorph/experiments/
+/TransMorph_Transformer_for_Medical_Image_Registration-main/IXI/
