@@ -34,9 +34,9 @@ class Logger(object):
 def main():
     batch_size = 1
     
-    train_dir = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/train/image/"
-    val_dir = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/val/image/"
-    val_lm_dir = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/val/landmarks/"
+    train_dir = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/train/image/"
+    val_dir = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/val/image/"
+    val_lm_dir = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/val/landmarks/"
 
     #! Validate these parameters: weights, lr, max_epoch
     weights = [1, 1] # loss weights #?How much both losses count
