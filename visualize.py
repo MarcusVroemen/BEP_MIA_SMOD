@@ -1,3 +1,4 @@
+#%%
 import os
 import numpy as np
 # from nibabel.testing import data_path
@@ -6,9 +7,10 @@ import matplotlib.pyplot as plt
 import scipy.ndimage as ndi
 
 #%% Append all paths for training data
-path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/train/image/"
-path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/val/image/"
-path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/test/image/"
+data_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/{}/image/"
+data_type="test"
+select_case = 0 
+path = data_path.format(data_type)
 paths=[]
 names=[]
 for subfolder in os.listdir(path):
@@ -17,12 +19,11 @@ for subfolder in os.listdir(path):
         names.append(str(subfolder)+"/"+str(filename))
 
 #%% Plot 3 slice directions and all phases        
-select_case = 0 
-paths=paths[select_case*3:select_case*3+3]
+paths_case=paths[select_case*3:select_case*3+3]
 names=names[select_case*3:select_case*3+3]
-fig, axs = plt.subplots(len(paths),3, figsize=(30*len(paths),90))
-for i in range(len(paths)):
-    img = nib.load(paths[i])
+fig, axs = plt.subplots(len(paths_case),3, figsize=(30*len(paths_case),90))
+for i in range(len(paths_case)):
+    img = nib.load(paths_case[i])
     img = img.get_fdata()
     for j in range(3):
         if j==0: #saggital #(160, 128, 160)

@@ -35,7 +35,7 @@ class Lung4DCTTrainDataset(Dataset):
         # transforms work with nhwtc
         x, y = x[None, ...], y[None, ...]
         # print(x.shape, y.shape)#((1, 160, 128, 160), (1, 160, 128, 160))
-        x,y = self.transforms([x, y])
+        x, y = self.transforms([x, y])
         # print(x.shape, y.shape)
         x = np.ascontiguousarray(x)# [Bsize,channelsHeight,,Width,Depth]
         y = np.ascontiguousarray(y)
