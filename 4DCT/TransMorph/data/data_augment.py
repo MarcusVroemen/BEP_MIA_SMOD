@@ -14,10 +14,47 @@ import numpy as np
 import nibabel as nib
 import random
 
-"""---------------------------------------------------------------------------------------------
-- cases 22+ other dimensions
-- from itk image types to np arrays
----------------------------------------------------------------------------------------------"""
+from data import datasets
+
+device = 'cpu'
+root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
+train_dataset = DatasetLung('train', root_data=root_data, augment_def=False)
+a,b,c,d = train_dataset[1]
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True)
+
+for batch_idx, (img_moving, img_fixed, lbl_moving, lbl_fixed) in enumerate(tqdm(train_loader, file=sys.stdout)):
+    # Take the img_moving and fixed images to the GPU
+    img_moving, img_fixed = img_moving.to(device), img_fixed.to(device)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # %%
