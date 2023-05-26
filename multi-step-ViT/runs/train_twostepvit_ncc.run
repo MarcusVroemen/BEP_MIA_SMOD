@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --mail-type=ALL                  		# Mail events (NONE, BEGIN, END, FAIL, ALL)
+#SBATCH --partition=bme.gpuresearch.q       	# Partition name
+#SBATCH --mail-user=i.d.kolenbrander@tue.nl    	# Where to send mail
+#SBATCH --nodes=1                        		# Use one node
+#SBATCH --ntasks=1                     			# Run a single task
+#SBATCH --time=500:00:00                  		# Time limit hrs:min:sec
+#SBATCH --output=/home/bme001/20210003/projects/J01_VIT/code/runs/Slurm_output/train_twostepvit_%A.out         	# Standard output and error log
+#SBATCH --gres=gpu:1
+
+module load cuda11.5/toolkit/11.5.1
+
+#___________________________________ 2-step VIT (Coarse-2-Fine) ___________________________________
+python ../train.py -net msvit --vit_steps 2 --patch_size 8 4 --stages 3 4 --embed_dim 48 48 --depths 2 2 --num_heads 4 4 --window_size 2 2 -rw 2 -lr 0.0001 -loss ncc -ep 10

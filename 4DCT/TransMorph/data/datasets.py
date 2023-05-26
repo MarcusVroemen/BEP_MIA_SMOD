@@ -277,12 +277,14 @@ class Dataset(torch.utils.data.Dataset):
        fixed_t = torch.from_numpy(fixed_np).unsqueeze(0)
        moving_label_t = torch.from_numpy(moving_label_np).unsqueeze(0)
        fixed_label_t = torch.from_numpy(fixed_label_np).unsqueeze(0)
-
-       fig, axs = plt.subplots(2, 2)
-       axs[0, 0].imshow(moving_t[:, :, 64, :].squeeze().numpy(), cmap='gray')
-       axs[0, 0].set_title('moving')
-       axs[0, 1].imshow(fixed_t[:, :, 64, :].squeeze().numpy(), cmap='gray')
-       axs[0, 1].set_title('fixed')
+       
+       plot=False
+       if plot:
+           fig, axs = plt.subplots(2, 2)
+           axs[0, 0].imshow(moving_t[:, :, 64, :].squeeze().numpy(), cmap='gray')
+           axs[0, 0].set_title('moving')
+           axs[0, 1].imshow(fixed_t[:, :, 64, :].squeeze().numpy(), cmap='gray')
+           axs[0, 1].set_title('fixed')
 
        if self.train_val_test == 'train' and self.augment_def:
            # Augmentation
@@ -290,12 +292,13 @@ class Dataset(torch.utils.data.Dataset):
            fixed_t, fixed_label_t = self.augment_on_the_fly(fixed_t, fixed_label_t)
            moving_t = self.add_gaussian_noise(moving_t)
            fixed_t = self.add_gaussian_noise(fixed_t)
-
-           axs[1, 0].imshow(moving_t[:, :, 64, :].squeeze().numpy(), cmap='gray')
-           axs[1, 0].set_title('moving augmented')
-           axs[1, 1].imshow(fixed_t[:, :, 64, :].squeeze().numpy(), cmap='gray')
-           axs[1, 1].set_title('fixed augmented')
-           plt.show()
+           
+           if plot:
+               axs[1, 0].imshow(moving_t[:, :, 64, :].squeeze().numpy(), cmap='gray')
+               axs[1, 0].set_title('moving augmented')
+               axs[1, 1].imshow(fixed_t[:, :, 64, :].squeeze().numpy(), cmap='gray')
+               axs[1, 1].set_title('fixed augmented')
+               plt.show()
 
        return moving_t, fixed_t, moving_label_t, fixed_label_t
 

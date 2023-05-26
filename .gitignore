@@ -5,6 +5,7 @@ logs/
 ITKElastix/
 gryds/
 RegNet/
+archive/
 !/TransMorph_Transformer_for_Medical_Image_Registration-main/4DCT/
 /TransMorph_Transformer_for_Medical_Image_Registration-main/4DCT/TransMorph/logs/
 /TransMorph_Transformer_for_Medical_Image_Registration-main/4DCT/TransMorph/experiments/
