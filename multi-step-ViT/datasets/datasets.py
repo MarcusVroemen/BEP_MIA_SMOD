@@ -92,8 +92,10 @@ class DatasetLung(Dataset):
         self.version = version
         self.phases = phases
         self.organ_list = []
-        self.img_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/image/***'
-        self.landmarks_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/landmarks/***'
+        # self.img_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/image/***'
+        # self.landmarks_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/landmarks/***'
+        self.img_folder = f'{root_data}/{train_val_test}/image/***'
+        self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
         # self.img_folder = f'/mnt/sda/DATA/LUNG_4DCT/DATA/PREPROCESSED/PREPROCESSED_V2.1/splitA/{train_val_test}/image/***'
         # self.landmarks_folder = f'/mnt/sda/DATA/LUNG_4DCT/DATA/PREPROCESSED/PREPROCESSED_V2.1/splitA/{train_val_test}/landmarks/***'
         self.init_paths()

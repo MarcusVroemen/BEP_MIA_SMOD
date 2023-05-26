@@ -1,5 +1,4 @@
 import argparse
-
 import numpy as np
 import pandas as pd
 import torch
@@ -8,34 +7,42 @@ from monai.losses import GlobalMutualInformationLoss
 from datasets.datasets import DatasetLung
 from executor.losses import Grad, NCC
 from executor.train_val import validate_epoch, train_epoch
-from model.utils import save_model, init_model, set_level_sequential_training_2
-from utils.neptune import init_neptune
+from model.utils import save_model, init_model#, set_level_sequential_training_2
+# from utils.neptune import init_neptune
 from utils.utils import set_seed
 
 torch.backends.cudnn.benchmark = True  # speed ups
+
+# import os
+# os.environ["PYDEVD_WARN_EVALUATION_TIMEOUT"] = "100"
+# print(os.environ.get("PYDEVD_WARN_EVALUATION_TIMEOUT"))
+
+base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
 
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - train script')
 parser.add_argument('-net', '--network', type=str, metavar='', default='msvit', help='network architecture used')
 parser.add_argument('--root_checkpoints', type=str, metavar='',
-                    default='/home/bme001/20210003/projects/J01_VIT/checkpoints', help='')
+                    default=base_path+"multi-step-ViT/checkpoints", help='')  #default='/home/bme001/20210003/projects/J01_VIT/checkpoints'
 parser.add_argument('--root_output', type=str, metavar='',
-                    default='/home/bme001/20210003/projects/J01_VIT/output/model_val_metrics', help='')
-parser.add_argument('--root_data', type=str, metavar='', default='/home/bme001/20210003/data', help='')
+                    default=base_path+'multi-step-ViT/output/model_val_metrics', help='')     # default='/home/bme001/20210003/projects/J01_VIT/output/model_val_metrics'
+parser.add_argument('--root_data', type=str, metavar='', default=base_path+"4DCT/data", help='')  # default='/home/bme001/20210003/data'
 parser.add_argument('-seed', '--random_seed', type=int, metavar='', default=1000, help='random seed')
 parser.add_argument('-dev', '--device', type=str, metavar='', default='cuda', help='device / gpu used')
 parser.add_argument('-nept', '--mode_neptune', type=str, metavar='', default='async',
                     help='Neptune run mode: async | debug')
+parser.add_argument('-run_nr', type=str, metavar='', default='1') #!added
+
 
 # MultiStepViT architecture
 parser.add_argument('--vit_steps', type=int, metavar='', default=2, help='the number of steps of the MultiStepViT')
 parser.add_argument('--patch_size', type=int, metavar='', default=[8, 4], nargs='+', help='patch size')
 parser.add_argument('--stages', type=int, metavar='', default=[3, 4], nargs='+', help='nr. of stages')
-parser.add_argument('--embed_dim', type=int, metavar='', default=[48], nargs='+', help='embedded dimensions')
-parser.add_argument('--depths', type=int, metavar='', default=[2], nargs='+', help='nr. of MSA blocks')
-parser.add_argument('--num_heads', type=int, metavar='', default=[4], nargs='+',
+parser.add_argument('--embed_dim', type=int, metavar='', default=[48, 48], nargs='+', help='embedded dimensions') #! [48]
+parser.add_argument('--depths', type=int, metavar='', default=[2,2], nargs='+', help='nr. of MSA blocks')   #! [2]
+parser.add_argument('--num_heads', type=int, metavar='', default=[4,4], nargs='+',                          #! [4]
                     help='nr. of attention heads in the MSA block')
-parser.add_argument('--window_size', type=int, metavar='', default=[2], nargs='+', help='window size')
+parser.add_argument('--window_size', type=int, metavar='', default=[2,2], nargs='+', help='window size')    #! [2]
 
 # Hyper-parameters for training
 parser.add_argument('-loss', '--similarity_loss', type=str, metavar='', default='ncc',
