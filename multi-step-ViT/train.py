@@ -82,14 +82,14 @@ if __name__ == "__main__":
         train_dataset.overfit_one(i=0)
         val_dataset = train_dataset
         val_dataset.train_val_test = 'val'
-    # run["dataset/size"] = len(train_dataset)
+    run["dataset/size"] = len(train_dataset)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
     """ INITIALIZE MODEL """
     model = init_model(args, img_size=train_dataset.inshape)
-    # run["model/trainable_params"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    # run["model/architecture"] = model
+    run["model/trainable_params"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    run["model/architecture"] = model
     model = model.to(args.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     if args.mode_neptune != 'debug':

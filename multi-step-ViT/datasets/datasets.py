@@ -10,6 +10,9 @@ from tqdm import tqdm
 
 from datasets.utils import copy_preprocessed_image, pad
 
+def read_pts(file_name, skiprows=0):
+    return torch.tensor(np.loadtxt(file_name, skiprows=skiprows), dtype=torch.float32)
+
 
 class Dataset(torch.utils.data.Dataset):
     """
@@ -100,6 +103,7 @@ class DatasetLung(Dataset):
         # self.landmarks_folder = f'/mnt/sda/DATA/LUNG_4DCT/DATA/PREPROCESSED/PREPROCESSED_V2.1/splitA/{train_val_test}/landmarks/***'
         self.init_paths()
         self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
+        self.offsets = [0, 0, 0] #!
 
     def init_paths(self):
         if self.phases == 'in_ex':
