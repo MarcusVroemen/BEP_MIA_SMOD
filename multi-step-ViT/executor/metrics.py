@@ -132,17 +132,18 @@ def get_metrics_dict(dict, image_1, image_2, label_1, label_2, points_1, points_
         append_value(dict, key, value)
 
     # Dices and HD
-    if label_1.sum().item() > 0 and label_2.sum().item() > 0:
-        dices = multiclass_dsc(label_1, label_2)
-        hd_95 = multiclass_hd95(label_1.cpu().squeeze().numpy(),
-                             label_2.cpu().squeeze().numpy(),
-                             dataset.voxel_spacing)
+    if label_1 != None:
+        if label_1.sum().item() > 0 and label_2.sum().item() > 0:
+            dices = multiclass_dsc(label_1, label_2)
+            hd_95 = multiclass_hd95(label_1.cpu().squeeze().numpy(),
+                                label_2.cpu().squeeze().numpy(),
+                                dataset.voxel_spacing)
 
-        for key, value in zip(dataset.organ_list, dices):
-            append_value(dict, 'DSC_' + key, value)
-        append_value(dict, 'DSC_mean', np.nanmean(dices))
-        append_value(dict, 'DSC_30', np.nanpercentile(dices, 30))
-        for key, value in zip(dataset.organ_list, hd_95):
-            append_value(dict, 'HD_' + key, value)
-        append_value(dict, 'HD_mean', np.nanmean(hd_95))
+            for key, value in zip(dataset.organ_list, dices):
+                append_value(dict, 'DSC_' + key, value)
+            append_value(dict, 'DSC_mean', np.nanmean(dices))
+            append_value(dict, 'DSC_30', np.nanpercentile(dices, 30))
+            for key, value in zip(dataset.organ_list, hd_95):
+                append_value(dict, 'HD_' + key, value)
+            append_value(dict, 'HD_mean', np.nanmean(hd_95))
     return dict, (loss_sim, loss_reg, loss)

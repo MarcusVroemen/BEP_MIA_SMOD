@@ -8,7 +8,7 @@ from datasets.datasets import DatasetLung
 from executor.losses import Grad, NCC
 from executor.train_val import validate_epoch, train_epoch
 from model.utils import save_model, init_model#, set_level_sequential_training_2
-# from utils.neptune import init_neptune
+from utils.neptune import init_neptune
 from utils.utils import set_seed
 
 torch.backends.cudnn.benchmark = True  # speed ups
@@ -18,6 +18,7 @@ torch.backends.cudnn.benchmark = True  # speed ups
 # print(os.environ.get("PYDEVD_WARN_EVALUATION_TIMEOUT"))
 
 base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
+base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
 
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - train script')
@@ -31,7 +32,7 @@ parser.add_argument('-seed', '--random_seed', type=int, metavar='', default=1000
 parser.add_argument('-dev', '--device', type=str, metavar='', default='cuda', help='device / gpu used')
 parser.add_argument('-nept', '--mode_neptune', type=str, metavar='', default='async',
                     help='Neptune run mode: async | debug')
-parser.add_argument('-run_nr', type=str, metavar='', default='1') #!added
+# parser.add_argument('-run_nr', type=str, metavar='', default='1') #!added
 
 
 # MultiStepViT architecture
@@ -66,9 +67,9 @@ if __name__ == "__main__":
     args.mode = 'train'
     # If you uncomment the code below and make an account on Neptune you can monitor the progress of your training
     # Also uncomment the lines starting with "run"  --> for example line 75 "run["dataset/size"] = len(train_dataset)" to actually log something to neptune
-    # run, args, epoch = init_neptune(args)
-    run = None # comment this line and the line below if you uncommented the lines above
-    epoch = 0
+    run, args, epoch = init_neptune(args)
+    # run = None # comment this line and the line below if you uncommented the lines above
+    # epoch = 0
 
     """ CONFIG DATASET """
     if args.dataset == 'lung':
