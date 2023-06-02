@@ -7,3 +7,5 @@ gryds/
 RegNet/
 archive/
 multi-step-ViT/checkpoints/
+*.raw
+logs/
