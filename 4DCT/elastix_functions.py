@@ -68,7 +68,7 @@ def registration(fixed_image, moving_image, method="rigid", plot=False, paramete
 
 def plot_registration(fixed_image, moving_image, result_image, deformation_field,
           name1="fixed image", name2="moving image", name3="result image", name4="deformation field",
-          title="In- and output of registration - corodal/transverse/saggital" , full=True):
+          title="In- and output of registration - frontal/transverse/saggital" , full=True):
     """Plot fixed, moving result image and deformation field
        Called after registration to see result"""
     
