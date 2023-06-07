@@ -25,7 +25,8 @@ import SimpleITK as sitk
 import cv2
 
 
-def registration(fixed_image, moving_image, method="rigid", plot=False, parameter_path=None):
+def registration(fixed_image, moving_image, method="rigid", plot=False, 
+                 parameter_path=None, output_directory=""):
     """Function that calls Elastix registration function
     Args:
         fixed_image: list with arrays of images (same as moving_image)
@@ -48,7 +49,7 @@ def registration(fixed_image, moving_image, method="rigid", plot=False, paramete
     result_image, result_transform_parameters = itk.elastix_registration_method(
         fixed_image, moving_image,
         parameter_object=parameter_object,
-        number_of_threads=8, log_to_console=True)
+        number_of_threads=8, log_to_console=True, output_directory=output_directory)
 
     # Deformation field
     deformation_field = itk.transformix_deformation_field(moving_image, result_transform_parameters)

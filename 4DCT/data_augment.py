@@ -4,23 +4,23 @@ import itk
 # import elastix
 # import imageio
 import matplotlib.pyplot as plt
-from matplotlib import colors, rcParams
+# from matplotlib import colors, rcParams
 import seaborn as sns
 # import scipy.stats as stats
 # import openpyxl
 import nibabel as nib
-import random
+# import random
 import os
-import sys
+# import sys
 from sklearn.decomposition import PCA
-import torch
-import torch.nn.functional as F
-import torch.utils.data
+# import torch
+# import torch.nn.functional as F
+# import torch.utils.data
 from matplotlib import pyplot as plt
-from tqdm import tqdm
+# from tqdm import tqdm
 import numpy as np
-import SimpleITK as sitk
-import cv2
+# import SimpleITK as sitk
+# import cv2
 import scipy.ndimage as ndi
 import gryds
 from sklearn import preprocessing
@@ -103,25 +103,48 @@ def validateDVFT00s(img_data, img_atlas, method="affine"):
             plt.tight_layout()
             plt.show()
             
-# validateDVFT00s(img_data=img_data_T00, img_atlas=A, method="affine")
+# validateDVFT00s(img_data=img_data_T00, img_atlas=img_atlas, method="affine")
 # conclusion: affine gives ok results
 
 
 #%% STEP 2 DVF GENERATION #################################################################
 def register_to_atlas(img_data, img_atlas):
     """Generate DVFs from set images registered on atlas image"""
-    DVFs_list = []
-    
+    params_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/transform_parameters/"
+    DVFs_list, DVFs_inverse_list, result_images = [], [], []
+    result_images = []
     for i in range(len(img_data)):
         result_image, DVF, result_transform_parameters = EF.registration(
-                    fixed_image=img_atlas, moving_image=img_data[i], 
-                    method="affine", plot=True)  # ?Affine or  bspline
+            fixed_image=img_atlas, moving_image=img_data[i], 
+            method="affine", plot=True, 
+            output_directory=params_path) 
+        print("start inverse")
+        # Inverse DVF
+        parameter_object = itk.ParameterObject.New()
+        parameter_map_rigid = parameter_object.GetDefaultParameterMap('rigid')
+        parameter_map_bspline = parameter_object.GetDefaultParameterMap('bspline')
+        parameter_map_bspline['HowToCombineTransforms'] = ['Compose']
+        parameter_map_rigid['HowToCombineTransforms'] = ['Compose']
+        parameter_object.AddParameterMap(parameter_map_rigid)
+        parameter_object.AddParameterMap(parameter_map_bspline)
+        
+        inverse_image, inverse_transform_parameters = itk.elastix_registration_method(
+            img_data[i], img_data[i],
+            parameter_object=parameter_object,
+            initial_transform_parameter_file_name=params_path+"TransformParameters.0.txt")
+        
+        inverse_transform_parameters.SetParameter(
+            0, "InitialTransformParametersFileName", "NoInitialTransform")
+        
+        DVF_inverse = itk.transformix_deformation_field(img_data[i], inverse_transform_parameters)
         
         DVFs_list.append(DVF)
-    
-    return DVFs_list
+        DVFs_inverse_list.append(DVF_inverse)
+        result_images.append(result_image)
+        
+    return DVFs_list, DVFs_inverse_list, result_images
 
-def DVF_conversion(DVF_itk, plot=False): 
+def DVF_conversion(DVF_itk): 
     """Converts DVF from itk to DVF usable with gryds"""
     # Reshapre DVF from (160, 128, 160, 3) to (3, 160, 128, 160)
     reshaped_DVF = np.transpose(np.asarray(DVF_itk), (3, 0, 1, 2))  
@@ -135,211 +158,41 @@ def DVF_conversion(DVF_itk, plot=False):
 
     return DVF_gryds
 
-def transform(DVF_itk, img_moving):
-    DVF_gryds = DVF_conversion(DVF_itk, plot=True)
-    a_bspline_transformation = gryds.BSplineTransformation(DVF_gryds)
+def transform(DVF_itk, img_moving, plot=False):
+    DVF_gryds = DVF_conversion(DVF_itk)
+    # DVF_gryds = DVF_itk
+    bspline_transformation = gryds.BSplineTransformation(DVF_gryds)
     an_image_interpolator = gryds.Interpolator(img_moving)
-    a_deformed_image = an_image_interpolator.transform(a_bspline_transformation)
-    EF.plot_registration(fixed_image=img_moving, moving_image=a_deformed_image, deformation_field=DVF_itk, full=True,
-                            result_image=np.asarray(img_moving) - np.asarray(a_deformed_image), title="transformation with averaged atlas DVF",
+    img_deformed = an_image_interpolator.transform(bspline_transformation)
+    if plot:
+        EF.plot_registration(fixed_image=img_moving, moving_image=img_deformed, deformation_field=DVF_itk, full=True, 
+                            result_image=np.asarray(img_moving) - np.asarray(img_deformed), title="transformation with averaged atlas DVF",
                             name1="train image", name2="result image", name3="subtracted image", name4="average atlas DVF")
+    return img_deformed
 
-#%% Generate atlas DVFs
-DVFs = register_to_atlas(img_data=img_data_T00, img_atlas=img_atlas)
-DVFs_arrays = [np.asarray(DVF) for DVF in DVFs]
-
-#%% apply DVFmean to images
-# DVF_mean = sum(DVFs_arrays) / len(DVFs_arrays)
-# DVF_gryds = DVF_conversion(DVF_mean, plot=True)
-
-# for img_moving in img_data_T00:
-#     a_bspline_transformation = gryds.BSplineTransformation(DVF_gryds)
-#     an_image_interpolator = gryds.Interpolator(img_moving)
-#     a_deformed_image = an_image_interpolator.transform(a_bspline_transformation)
-#     EF.plot_registration(fixed_image=img_moving, moving_image=a_deformed_image, deformation_field=DVF_mean, full=True,
-#                          result_image=np.asarray(img_moving) - np.asarray(a_deformed_image), title="transformation with averaged atlas DVF",
-#                          name1="train image", name2="result image", name3="subtracted image", name4="average atlas DVF")
-
-#%% #!--------PCA-----------
-#Turn each DVF into an array and reshapeto 3276800x3
-DVFs_columns = [np.reshape(np.asarray(DVF), (-1, 3)) for DVF in DVFs]    
-#Concatenate DVFs into matrix V with shape 3276800x(3*len(DVFs_arrays))
-V = np.concatenate(DVFs_columns, axis=1)                
-#Average DVFs into matrix Vmean with shape 3276800x3        
-Vmean = sum(DVFs_columns) / len(DVFs_columns)             
-V_mean = np.mean(V, axis=1) #?
-# U eigenvectors of principal modes
-# d eigenvalues of principal modes
-# x array of random numbers following distribution N(0,simga)
-# vg = Vmean + U*x*d
-#? scale or not?
-
-#%% #*Scale data
-standard_scalar = preprocessing.StandardScaler(with_mean=True, with_std=True)
-V_standardscaled = standard_scalar.fit_transform(V)
-fig, axes = plt.subplots(1, 2, figsize=(10,5))
-sns.boxplot(data=V, ax=axes[0]).set(title='V', xlabel='Variable')
-sns.boxplot(data=V_standardscaled, ax=axes[1]).set(title='V Standard scaled', xlabel='Variable')
-plt.tight_layout()
-plt.show()
-#%% #*Determine number of components needed
-def determine_n_PC(data):
-    """ Function that plots the variance explained by the principal components
-    per number of components used. This can be used to the determine the components
-    necessary to explain for example 90% of the data's variance.
+def dimreduction(DVFs):
+    """Apply PCA to get DVF values for expression of DVF generation
+    Args:
+        DVFs (list): list with DVF's either in shape (160, 128, 160, 3) or itk.itkImagePython.itkImageVF33
+    Returns:
+        DVF_mean (list with arrays): For each direction the mean of inputted DVFs
+        DVF_Ud (list with arrays): For each direction the PCA components needed to generate the artificial DVFs
     """
-    variances = []
-    PCs = []
-    # For each number of components calcualate explained variance
-    for i in range(1,len(data[1])+1):
-        pca = PCA(n_components=i) # estimate only i PCs
-        pca.fit_transform(data) # project the original data into the PCA space
-        variance_explained = (pca.explained_variance_ratio_).sum()
-        variances.append(variance_explained)
-        PCs.append(i)
+    # Convert (160, 128, 160, 3) to (3276800, 3)
+    DVFs_columns = [np.reshape(np.asarray(DVF), (-1, 3)) for DVF in DVFs]  
+    # Make empty lists for args to return
+    DVF_mean, DVF_Ud = [],[]
     
-    # Plot this data in a barplot    
-    fig = plt.figure()
-    plt.title('Variance explained by PCA')
-    plt.bar(PCs, variances)
-    plt.xlabel('Number of principle components')
-    plt.ylabel('Variance explained')
-    plt.xticks(PCs)
-    plt.yticks(np.arange(0, 1.1, step=0.1)) 
-    plt.tight_layout()
-    plt.show()
-    print(variances)
-
-# Determine how much variance components in PCA explain
-determine_n_PC(data=V_standardscaled)
-
-#%% #! data=V [0.4759334, 0.7600839, 1.00234547,…]
-pca = PCA(n_components=3)
-pca.fit_transform(V)
-# Get the eigenvectors (principal axes)
-eigenvectors = pca.components_
-
-# Get the eigenvalues (variances) of the principal components
-eigenvalues = pca.explained_variance_
-
-# Print the eigenvectors and eigenvalues
-for i in range(len(eigenvalues)):
-    print(f"Principal Component {i+1}:")
-    print("Eigenvalue:", eigenvalues[i])
-    print("Eigenvector:", eigenvectors[i])
-    print()
-
-# Transform the data using the principal components
-transformed_data = pca.transform(V)
-# Print the shape of transformed data (3276800, 2)
-print("Transformed data shape:", transformed_data.shape)
-
-Vmean = sum(DVFs_columns) / len(DVFs_columns)             
-x = np.random.normal(0, 1, Vmean.shape)
-#%%
-print(eigenvectors.shape, eigenvalues.shape, x.shape) #(3, 27) (3,) (3276800, 3)
-# (3, 27) (3,) -> (3, 27)
-PCA_values = eigenvectors*eigenvalues[:, np.newaxis]
-# (3, 3276800) (3276800, 3) -> (3,3)
-temp = np.dot(PCA_values, x)
-
-
-
-# (2,27)*(2,)*(3276800, 3)=(2,27)
-PCA_values = eigenvectors*eigenvalues[:, np.newaxis]*x
-# Idea1: (3276800, 3) + (2,27)
-# vg1 = Vmean + PCA_values
-# Idea2: (3276800, 27) * (2,27)
-vg2 = V * PCA_values[0] + V * PCA_values[1]
-Vmean = sum(DVFs_columns) / len(DVFs_columns)   
-
-restored_array = np.reshape(vg2, (160, 128, 160, 3))
-
-
-
-
-
-# assume PCA_values scale V
-
-#%% #!data=V.T [0.4557183, 0.71959734, 0.9122899,...]
-pca = PCA(n_components=3)
-pca.fit_transform(V.T)
-# Get the eigenvectors (principal axes)
-eigenvectors = pca.components_
-
-# Get the eigenvalues (variances) of the principal components
-eigenvalues = pca.explained_variance_
-
-# Print the eigenvectors and eigenvalues
-for i in range(len(eigenvalues)):
-    print(f"Principal Component {i+1}:")
-    print("Eigenvalue:", eigenvalues[i])
-    print("Eigenvector:", eigenvectors[i])
-    print()
-
-Vmean = sum(DVFs_columns) / len(DVFs_columns)             
-x = np.random.normal(0, 1, Vmean.shape)
-#%% 
-print(eigenvectors.shape, eigenvalues.shape, x.shape) #!eigenvalues large
-# (3, 3276800) (3,) -> (3, 3276800)
-PCA_values = eigenvectors*eigenvalues[:, np.newaxis]/5000
-# (3, 3276800) (3276800, 3) -> (3,3)
-temp = PCA_values * np.random.normal(0, 1, (3,))[:, np.newaxis]
-Vmethod1 = Vmean + temp.T
-# -> (3276800, 3)
-
-
-PCA_values = eigenvectors
-# (3, 3276800) (3276800, 3) -> (3,3)
-temp = PCA_values *5000
-Vmethod2 = Vmean + temp.T
-
-#%% method3: apply pca on only 1 DVF and add this to the vmean
-# V=DVFs_columns[0]
-
-
-#%% method4: GPT
-# Step 1: Calculate the mean velocity field
-# Load your velocity fields data into a numpy array
-# velocity_fields = np.random.rand(3276800, 3)
-Vone = DVFs_columns[0]
-# Apply PCA to reduce the dimensionality of the data
-pca = PCA(n_components=2)
-reduced_data = pca.fit_transform(Vone)
-
-# Generate random velocity fields
-V_prime = np.mean(Vone, axis=0)
-U = pca.components_
-d = pca.explained_variance_
-x = np.random.normal(0, 1, (9, 2))
-vg = V_prime + U.T @ (d * x.T)
-
-#%%
-"""
-V               (3276800,27)
-pca.fit(V.T) or pca.fit(V)
-eigenvectors    (2,27)  or (2,3276800)
-eigenvalues     (2)
-x               (3276800, 3)
-
-Vmean   (3276800,3) or (3276800,)    
-    
-    (3276800,3) + 
-    
-"""
-#%% OPERATION IS V IN ONE DIRECTION
-DVFs_columns = [np.reshape(np.asarray(DVF), (-1, 3)) for DVF in DVFs]  
-
-new_DVFs = []
-for j in range(4):
-    # new_DVF = np.array([])
-    new_DVF = np.zeros((DVFs_columns[0].shape[0], 3))
     for i in range(3):
         # Select OndeDirection (x, y, or z) of displacement fields
         DVFs_OD = [DVF[:,i] for DVF in DVFs_columns]
+        # Average DVFs from one direction and add to list to return
+        DVF_OD_mean = np.mean(DVFs_OD, axis=0) 
+        DVF_mean.append(DVF_OD_mean)
+        
         # Scale data
-        # standard_scalar = preprocessing.StandardScaler(with_mean=True, with_std=True)
-        # Vxs = standard_scalar.fit_transform(Vxs)
+        standard_scalar = preprocessing.StandardScaler(with_mean=True, with_std=True)
+        DVFs_OD = standard_scalar.fit_transform(DVFs_OD)
         
         # Fit PCA
         pca = PCA()
@@ -349,64 +202,82 @@ for j in range(4):
         num_components = np.argmax(explained_variance_ratio_cumsum >= 0.9) + 1
         # print(num_components, explained_variance_ratio_cumsum)
 
-        # Calculate variables
-        U = pca.components_[:num_components,:]         #(2, 3276800)
-        d = pca.explained_variance_[:num_components] #(2,)
-        x = np.random.normal(loc=0, scale=10, size=num_components)
-        DVF_OD_mean = np.mean(DVFs_OD, axis=0)
+        # Calculate PCA variables to return
+        U = pca.components_[:num_components,:]              #(2, 3276800)
+        d = pca.explained_variance_[:num_components]        #(2,)
+        # Scale eigenvectors with eigenvalues, that are scaled with the total amount of variance
+        d_scaled = d/sum(pca.explained_variance_)           #sum_all=1
+        Ud = U * d_scaled[:, np.newaxis]                    #(p, 3276800)  
+        # Adding U*d to list with 3 dimensions
+        DVF_Ud.append(Ud)
 
-        # Compute new DVF_OD
-        # Scale eigenvalues with dimensions, and multiply with eigenvectors to scale them
-        U_scaled = U * (d[:, np.newaxis]/DVF_OD_mean.shape[0])   #(2, 3276800)   [ 0.0188702 ,  0.01868925   [-0.00175282, -0.00176007,
-        # Add random array
-        U_sr = np.dot(x, U_scaled)             #(3276800,)     [ 0.00820394,  0.00813201,  0.00806008
-        # Add to average Vx 
-        DVF_OD_new = DVF_OD_mean + U_sr
-        
-        # Adding direction to new DVF
-        new_DVF[:,i]=DVF_OD_new
+    return DVF_mean, DVF_Ud
   
-    # plt.imshow(np.reshape(new_DVF, (160, 128, 160, 3))[:,64,:,0])
-    new_DVFs.append(np.reshape(new_DVF, (160, 128, 160, 3)))
+def generate_artificial_DVFs(amount, sigma, DVFs):
+    """Generate artificial DVFs from list with to_atlas_DVFs
+    Args:
+        amount (int): amount of artificial DVFs to generate
+        sigma (int): random scaling component 100: visual deformations, 500: too much
+        DVFs (list): list with DVF's either in shape (160, 128, 160, 3) or itk.itkImagePython.itkImageVF33
+    Returns:
+        DVFs_artificial (list with arrays): artificial DVFs with shape (160, 128, 160, 3)
+    """
+    # Call dimreduction to calculate mean and PCA components
+    DVF_mean, DVF_Ud = dimreduction(DVFs)
+    
+    DVFs_artificial = []
+    for i in range(amount):
+        DVF_artificial = np.zeros((DVF_mean[0].shape[0], 3))
+        for j in range(3):
+            x = np.random.normal(loc=0, scale=sigma, size=DVF_Ud[j].shape[0])
+            # Paper: vg = Vmean + U*x*d 
+            DVF_artificial[:,j] = DVF_mean[j] + np.dot(DVF_Ud[j].T, x)  #(3276800,1)
+        DVFs_artificial.append(np.reshape(DVF_artificial, (160, 128, 160, 3)))
 
+    return DVFs_artificial
+
+#%% Generate atlas DVFs + inverse
+DVFs, DVFs_inverse, T00_to_atlas = register_to_atlas(img_data=img_data_T00, img_atlas=img_atlas)
+
+#%% VALIDATE INVERSE: For every DVF plot DVF, DVF_inverse and their effect on a training image
+def validate_inverse(DVFs, DVFs_inverse, img_moving):
+    fig, ax = plt.subplots(len(DVFs),4, figsize=(40,50))
+    for i in range(len(DVFs)):
+        ax[i,0].imshow(np.asarray(DVFs[i])[:,64,:,2])
+        img_ogDVF = transform(DVF_itk=DVFs[i], img_moving=img_moving, plot=False)
+        ax[i,1].imshow(img_ogDVF[:,64,:])
+        ax[i,2].imshow(np.asarray(DVFs_inverse[i])[:,64,:,2])
+        img_invDVF = transform(DVF_itk=DVFs_inverse[i], img_moving=img_moving, plot=False)
+        ax[i,3].imshow(img_invDVF[:,64,:])
+    plt.tight_layout()
+    plt.show()
+# validate_inverse(DVFs, DVFs_inverse, img_moving=img_data_T00[0])
 #%%
 
+#%% Generate artificial DVFs
+# DVFs_artificial = generate_artificial_DVFs(amount=5, sigma=100,DVFs=DVFs)
+DVFs_artificial_inverse100 = generate_artificial_DVFs(amount=5, sigma=100,DVFs=DVFs_inverse)
+DVFs_artificial_inverse200 = generate_artificial_DVFs(amount=5, sigma=200,DVFs=DVFs_inverse)
+DVFs_artificial_inverse300 = generate_artificial_DVFs(amount=5, sigma=300,DVFs=DVFs_inverse)
+DVFs_artificial_inverse500 = generate_artificial_DVFs(amount=5, sigma=500,DVFs=DVFs_inverse)
+#%%
+# img_moving = img_data_T00[1]
+# fig, ax = plt.subplots(len(DVFs_artificial),4, figsize=(40,50))
+# for i in range(len(DVFs_artificial)):
+#     ax[i,0].imshow(np.asarray(DVFs_artificial[i])[:,64,:,2])
+#     img_ogDVF = transform(DVF_itk=DVFs_artificial[i], img_moving=img_moving, plot=False)
+#     ax[i,1].imshow(img_ogDVF[:,64,:])
+#     ax[i,2].imshow(np.asarray(DVFs_artificial_inverse[i])[:,64,:,2])
+#     img_invDVF = transform(DVF_itk=DVFs_artificial_inverse[i], img_moving=img_moving, plot=False)
+#     ax[i,3].imshow(img_invDVF[:,64,:])
+# plt.tight_layout()
+# plt.show()
 
-
-#%% Transform data
-img_moving = img_data_T00[5]
-
-# Compare with mean DVF
-DVF_mean = sum(DVFs_arrays) / len(DVFs_arrays)
-transform(DVF_itk=DVF_mean, img_moving=img_moving)
-
-
-for i in range(len(new_DVFs)):
-    transform(DVF_itk=new_DVFs[i], img_moving=img_moving)
-#%% Restore array
-DVF_mean = sum(DVFs_arrays) / len(DVFs_arrays)
-
-# Convert and DVFs take Vmean and reshape to og
-DVFs_columns = [np.reshape(np.asarray(DVF), (-1, 3)) for DVF in DVFs]    
-Vmean = sum(DVFs_columns) / len(DVFs_columns) 
-DVF_vmean = np.reshape(Vmean, (160, 128, 160, 3))
-
-# From PCA method1 -> values way to large
-DVF_method1 = np.reshape(Vmethod1, (160, 128, 160, 3))
-DVF_method2 = np.reshape(Vmethod2, (160, 128, 160, 3))
-
-# Perform transformation
-
-
-img_moving = img_grid
-img_moving = img_data_T00[5]
-
-# transform(DVF_itk=DVF_mean, img_moving=img_data_T00[imgnr])
-# transform(DVF_itk=DVF_vmean, img_moving=img_data_T00[imgnr])
-# transform(DVF_itk=DVF_method1, img_moving=img_data_T00[imgnr])
-# transform(DVF_itk=DVF_method1, img_moving=img_data_T50[imgnr])
-# transform(DVF_itk=DVF_method1, img_moving=img_moving)
-# transform(DVF_itk=DVF_method2, img_moving=img_moving)
-for i in range(new_DVFs):
-    transform(DVF_itk=new_DVFs[i], img_moving=img_moving)
-# %%
+#%% Generate arti
+DVFs_artificial_inverse = DVFs_artificial_inverse500
+for i in range(len(T00_to_atlas)):
+    for j in range(len(DVFs_artificial_inverse[:3])):
+        img_artificial = transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=T00_to_atlas[i], plot=False)
+        EF.plot_registration(fixed_image=img_data_T00[i], moving_image=T00_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
+                             name1="T00 original", name2="T00 to atlas", name3="artificial T00", name4="artificial DVF",
+                             title="Creating artificial images", full=True)
