@@ -1,141 +1,58 @@
-# %%
-import itk
-# Import the required libraries
-# import elastix
-# import imageio
 import matplotlib.pyplot as plt
-# from matplotlib import colors, rcParams
-import seaborn as sns
-# import scipy.stats as stats
-# import openpyxl
-import nibabel as nib
-# import random
-import os
-# import sys
-from sklearn.decomposition import PCA
-# import torch
-# import torch.nn.functional as F
-# import torch.utils.data
-from matplotlib import pyplot as plt
-# from tqdm import tqdm
 import numpy as np
-# import SimpleITK as sitk
-# import cv2
-import scipy.ndimage as ndi
-import gryds
-from sklearn import preprocessing
+import os
 from sklearn.decomposition import PCA
+from sklearn import preprocessing
+import itk
+import gryds
+import nibabel as nib
+import scipy.ndimage as ndi
 
 import datasets_utils as DU 
 import elastix_functions as EF
 plt.rcParams['image.cmap'] = 'gray'
 
 
-#%% Data preparation
-root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
-train_dataset = DU.DatasetLung('train', root_data=root_data, augment_def=False, phases="in_ex")
+#* functions #########################
+def prepara_traindata(root_data):
+    train_dataset = DU.DatasetLung('train', root_data=root_data, augment_def=False, phases="in_ex")
 
-img_data_T00, img_data_T50, img_data_T90 = [], [], []
-for i in range(len(train_dataset)):
-    img_fixed, img_moving,_,_ = train_dataset[i]
-    if i%2==0:
-        img_data_T00.append(img_fixed.squeeze(0).numpy()), img_data_T50.append(img_moving.squeeze(0).numpy())  #fixed T50 are dubble, moving T00 and T90       
-    else:           
-        img_data_T90.append(img_fixed.squeeze(0).numpy())
+    img_data_T00, img_data_T50, img_data_T90 = [], [], []
+    for i in range(len(train_dataset)):
+        img_fixed, img_moving,_,_ = train_dataset[i]
+        if i%2==0:
+            img_data_T00.append(img_fixed.squeeze(0).numpy()), img_data_T50.append(img_moving.squeeze(0).numpy())  #fixed T50 are dubble, moving T00 and T90       
+        else:           
+            img_data_T90.append(img_fixed.squeeze(0).numpy())
 
-img_data_T00 = [itk.image_from_array(arr) for arr in img_data_T00]
-img_data_T50 = [itk.image_from_array(arr) for arr in img_data_T50]
-img_data_T90 = [itk.image_from_array(arr) for arr in img_data_T90]
+    img_data_T00 = [itk.image_from_array(arr) for arr in img_data_T00]
+    img_data_T50 = [itk.image_from_array(arr) for arr in img_data_T50]
+    img_data_T90 = [itk.image_from_array(arr) for arr in img_data_T90]
+    
+    return img_data_T00, img_data_T50, img_data_T90
 
-# Create an image grid
-img_grid = np.zeros((160, 128, 160))
-line_interval = 5  # Adjust this value to change the interval between lines
-img_grid[:, ::line_interval, :] = 1
-img_grid[:, :, ::line_interval] = 1
-img_grid[::line_interval, :, :] = 1
-# plt.imshow(img_grid[:,64,:])
-
-#%% STEP 1 ATLAS GENERATION (or load)
-generate=False
-if generate:
-    # Generate atlas image
-    img_atlas = EF.generate_atlas(img_data=img_data_T00)
-    plt.imshow(img_atlas[:,64,:], cmap="gray")
-
-    img = nib.load(root_data+'train/image/case_001/T00.nii.gz')
-    img_atlas_nib = nib.Nifti1Image(img_atlas, img.affine)
-    nib.save(img_atlas_nib, os.path.join(root_data,'atlas', 'atlasv1.nii.gz'))
-else:
-    img_atlas = nib.load(root_data+'atlas/atlasv1.nii.gz')
-    img_atlas = img_atlas.get_fdata()
-    img_atlas = itk.image_from_array(ndi.rotate((img_atlas).astype(np.float32),0)) # itk.itkImagePython.itkImageF3
-    plt.imshow(img_atlas[:,64,:], cmap="gray")
-
-#%% VALIDATION: Apply all DVFT00 to all training images
-def validateDVFT00s(img_data, img_atlas, method="affine"):
-    """Registrate img_data to atlas image and apply those DVFs to all img_data
-    The goal of this function is to see how see how a DVF from one image to atlas 
-    manipulates a different image"""
-    img_data = img_data_T00[0:4]
-    DVFs_params = []
-    DVFs = []
-    for i in range(len(img_data)):
-        moving_image = img_data[i]
-        result_image, DVF, result_transform_parameters = EF.registration(
-                    fixed_image=img_atlas, moving_image=moving_image, 
-                    method=method, plot=True)  # ?Affine or  bspline
-        DVFs.append(DVF)
-        DVFs_params.append(result_transform_parameters)
-
-    # apply every transformation from original to atlas, to each image
-    # this will test how DVFs from other image pairs change existing images
-    for moving_image in img_data:
-        for result_transform_parameters in DVFs_params:
-            result_image_transformix = itk.transformix_filter(
-                moving_image,
-                result_transform_parameters)
-
-            fig, axs = plt.subplots(2)
-            axs[0].imshow(moving_image[:, 64, :], cmap='gray')
-            axs[0].set_title("original image")
-            axs[1].imshow(result_image_transformix[:, 64, :], cmap='gray')
-            axs[1].set_title("image with DVFT00")
-            plt.tight_layout()
-            plt.show()
-            
-# validateDVFT00s(img_data=img_data_T00, img_atlas=img_atlas, method="affine")
-# conclusion: affine gives ok results
-
-
-#%% STEP 2 DVF GENERATION #################################################################
-def register_to_atlas(img_data, img_atlas):
+def register_to_atlas(img_data, img_atlas, method="affine", plot=False):
     """Generate DVFs from set images registered on atlas image"""
-    params_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/transform_parameters/"
+    params_path="transform_parameters/" #!
     DVFs_list, DVFs_inverse_list, result_images = [], [], []
     result_images = []
     for i in range(len(img_data)):
         result_image, DVF, result_transform_parameters = EF.registration(
             fixed_image=img_atlas, moving_image=img_data[i], 
-            method="affine", plot=True, 
+            method=method, plot=plot, 
             output_directory=params_path) 
-        print("start inverse")
+        
         # Inverse DVF
         parameter_object = itk.ParameterObject.New()
-        parameter_map_rigid = parameter_object.GetDefaultParameterMap('rigid')
-        parameter_map_bspline = parameter_object.GetDefaultParameterMap('bspline')
-        parameter_map_bspline['HowToCombineTransforms'] = ['Compose']
-        parameter_map_rigid['HowToCombineTransforms'] = ['Compose']
-        parameter_object.AddParameterMap(parameter_map_rigid)
-        parameter_object.AddParameterMap(parameter_map_bspline)
-        
+        parameter_map = parameter_object.GetDefaultParameterMap(method)
+        parameter_map['HowToCombineTransforms'] = ['Compose']
+        parameter_object.AddParameterMap(parameter_map)
         inverse_image, inverse_transform_parameters = itk.elastix_registration_method(
             img_data[i], img_data[i],
             parameter_object=parameter_object,
             initial_transform_parameter_file_name=params_path+"TransformParameters.0.txt")
-        
         inverse_transform_parameters.SetParameter(
             0, "InitialTransformParametersFileName", "NoInitialTransform")
-        
         DVF_inverse = itk.transformix_deformation_field(img_data[i], inverse_transform_parameters)
         
         DVFs_list.append(DVF)
@@ -159,8 +76,15 @@ def DVF_conversion(DVF_itk):
     return DVF_gryds
 
 def transform(DVF_itk, img_moving, plot=False):
+    """Transform an image with a DVF using the gryds library
+    Since the gryds format for DVFs is different to ITK, first the DVF is scaled
+    Args:
+        DVF_itk: DVF as array or itk object with displacements in pixels
+            (converted to displacments scaled to image size with DVF_conversion)
+        img_moving: to transform image
+    """
     DVF_gryds = DVF_conversion(DVF_itk)
-    # DVF_gryds = DVF_itk
+
     bspline_transformation = gryds.BSplineTransformation(DVF_gryds)
     an_image_interpolator = gryds.Interpolator(img_moving)
     img_deformed = an_image_interpolator.transform(bspline_transformation)
@@ -213,20 +137,21 @@ def dimreduction(DVFs):
 
     return DVF_mean, DVF_Ud
   
-def generate_artificial_DVFs(amount, sigma, DVFs):
+def generate_artificial_DVFs(DVFs_artificial_components, num_images, sigma):
     """Generate artificial DVFs from list with to_atlas_DVFs
     Args:
-        amount (int): amount of artificial DVFs to generate
+        DVFs_artificial_components (list with arrays): DVF_mean, DVF_Ud from dimreduction()
+        num_images (int): amount of artificial DVFs to generate
         sigma (int): random scaling component 100: visual deformations, 500: too much
         DVFs (list): list with DVF's either in shape (160, 128, 160, 3) or itk.itkImagePython.itkImageVF33
     Returns:
         DVFs_artificial (list with arrays): artificial DVFs with shape (160, 128, 160, 3)
     """
-    # Call dimreduction to calculate mean and PCA components
-    DVF_mean, DVF_Ud = dimreduction(DVFs)
+    # Unpack mean and PCA components from dimreduction()
+    DVF_mean, DVF_Ud = DVFs_artificial_components
     
     DVFs_artificial = []
-    for i in range(amount):
+    for i in range(num_images):
         DVF_artificial = np.zeros((DVF_mean[0].shape[0], 3))
         for j in range(3):
             x = np.random.normal(loc=0, scale=sigma, size=DVF_Ud[j].shape[0])
@@ -236,48 +161,180 @@ def generate_artificial_DVFs(amount, sigma, DVFs):
 
     return DVFs_artificial
 
-#%% Generate atlas DVFs + inverse
-DVFs, DVFs_inverse, T00_to_atlas = register_to_atlas(img_data=img_data_T00, img_atlas=img_atlas)
-
-#%% VALIDATE INVERSE: For every DVF plot DVF, DVF_inverse and their effect on a training image
-def validate_inverse(DVFs, DVFs_inverse, img_moving):
-    fig, ax = plt.subplots(len(DVFs),4, figsize=(40,50))
+def validate_DVFs(DVFs, DVFs_inverse, img_moving):
+    """Plot DVFs and inverse with effect on images to validate them
+    Args:
+        DVFs: itk or array type DVFs that register imgs to atlas
+        DVFs_inverse: inverse itk or array type DVFs that
+        img_moving: an image where the DVFs are applied to
+    """
+    fig, ax = plt.subplots(len(DVFs),5, figsize=(40,50))
     for i in range(len(DVFs)):
+        # DVF and img+DVF
         ax[i,0].imshow(np.asarray(DVFs[i])[:,64,:,2])
         img_ogDVF = transform(DVF_itk=DVFs[i], img_moving=img_moving, plot=False)
         ax[i,1].imshow(img_ogDVF[:,64,:])
+        ax[i,1].set_title("original deformed with DVF")
+        # DVFinverse and img+DVFinverse
         ax[i,2].imshow(np.asarray(DVFs_inverse[i])[:,64,:,2])
         img_invDVF = transform(DVF_itk=DVFs_inverse[i], img_moving=img_moving, plot=False)
         ax[i,3].imshow(img_invDVF[:,64,:])
+        ax[i,3].set_title("original deformed with DVFinv")
+        # img+DVFinverse+DVF
+        img_3 = transform(DVF_itk=DVFs[i], img_moving=img_invDVF, plot=False)
+        ax[i,4].imshow(img_3[:,64,:])
+        ax[i,4].set_title("original deformed with DVFinf and DVF")
     plt.tight_layout()
     plt.show()
-# validate_inverse(DVFs, DVFs_inverse, img_moving=img_data_T00[0])
-#%%
 
-#%% Generate artificial DVFs
-# DVFs_artificial = generate_artificial_DVFs(amount=5, sigma=100,DVFs=DVFs)
-DVFs_artificial_inverse100 = generate_artificial_DVFs(amount=5, sigma=100,DVFs=DVFs_inverse)
-DVFs_artificial_inverse200 = generate_artificial_DVFs(amount=5, sigma=200,DVFs=DVFs_inverse)
-DVFs_artificial_inverse300 = generate_artificial_DVFs(amount=5, sigma=300,DVFs=DVFs_inverse)
-DVFs_artificial_inverse500 = generate_artificial_DVFs(amount=5, sigma=500,DVFs=DVFs_inverse)
-#%%
-# img_moving = img_data_T00[1]
-# fig, ax = plt.subplots(len(DVFs_artificial),4, figsize=(40,50))
-# for i in range(len(DVFs_artificial)):
-#     ax[i,0].imshow(np.asarray(DVFs_artificial[i])[:,64,:,2])
-#     img_ogDVF = transform(DVF_itk=DVFs_artificial[i], img_moving=img_moving, plot=False)
-#     ax[i,1].imshow(img_ogDVF[:,64,:])
-#     ax[i,2].imshow(np.asarray(DVFs_artificial_inverse[i])[:,64,:,2])
-#     img_invDVF = transform(DVF_itk=DVFs_artificial_inverse[i], img_moving=img_moving, plot=False)
-#     ax[i,3].imshow(img_invDVF[:,64,:])
-# plt.tight_layout()
-# plt.show()
+def generate_artificial_imgs(img_to_atlas, DVFs_artificial_inverse, img_data="", plot=False):
+    """Use DVFs and images registered to atlas to generate artificial images
+    Args:
+        img_to_atlas: images generated by registering them to atlas image
+        DVFs_artificial_inverse: itk or array type DVFs from generate_artificial_DVFs() function
+        img_data: original images, only used for visualization
+        plot: plots original, to-atlas and artificial image
+    """
+    imgs_artificial = []
+    for i in range(len(img_to_atlas)):
+        for j in range(len(DVFs_artificial_inverse)):
+            img_artificial = transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=img_to_atlas[i], plot=False)
+            imgs_artificial.append(img_artificial)
+            if plot:
+                EF.plot_registration(fixed_image=img_data[i], moving_image=img_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
+                                    name1="T00 original", name2="T00 to atlas", name3="artificial T00", name4="artificial DVF",
+                                    title="Creating artificial images", full=True)
+    return imgs_artificial   
 
-#%% Generate arti
-DVFs_artificial_inverse = DVFs_artificial_inverse500
-for i in range(len(T00_to_atlas)):
-    for j in range(len(DVFs_artificial_inverse[:3])):
-        img_artificial = transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=T00_to_atlas[i], plot=False)
-        EF.plot_registration(fixed_image=img_data_T00[i], moving_image=T00_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
-                             name1="T00 original", name2="T00 to atlas", name3="artificial T00", name4="artificial DVF",
-                             title="Creating artificial images", full=True)
+# Large functions
+def data_augm_preprocessing(img_data, generate=True):
+    """Preprocessing of data augmentation which created the components for artificial DVFs and img_to_atlas
+    Split from the data_augm_generation since these components only have to be made once which can be done as preprocessing step
+    Function includes: (1) atlas generation, (2) registration to atlas, (3) calculate components for artificial DVFs
+    Args:
+        generate (bool): Whether to generate atlas or load it in #*temporaty
+        img_data (list with itk images): original training data to augment
+    Returns:
+        DVFs_artificial_components: components necessary for DVF generation (DVF_mean, DVF_Ud), does not contain random component yet
+        img_to_atlas (list with itk images): original training data registered to atlas
+    """
+    # (1) Generate or get atlas image
+    if generate:
+        # Generate atlas image
+        img_atlas = EF.generate_atlas(img_data=img_data)
+        plt.imshow(img_atlas[:,64,:], cmap="gray")
+        # Save atlas image
+        img = nib.load(root_data+'train/image/case_001/T00.nii.gz')
+        img_atlas_nib = nib.Nifti1Image(img_atlas, img.affine)
+        nib.save(img_atlas_nib, os.path.join(root_data,'atlas', 'atlasv1.nii.gz'))
+    else:
+        # Load already generated atlas image
+        img_atlas = nib.load(root_data+'atlas/atlasv1.nii.gz')
+        img_atlas = img_atlas.get_fdata()
+        img_atlas = itk.image_from_array(ndi.rotate((img_atlas).astype(np.float32),0)) # itk.itkImagePython.itkImageF3
+        plt.imshow(img_atlas[:,64,:], cmap="gray")
+    
+    # (2) Register to atlas for DVFinverse and img_to_atlas    
+    DVFs, DVFs_inverse, img_to_atlas = register_to_atlas(img_data=img_data, img_atlas=img_atlas)
+    
+    # Optionally validate DVFs and DVFs_inverse (uncomment next line)
+    # validate_DVFs(DVFs, DVFs_inverse, img_moving=img_data[0])
+    
+    # (3) Get components needed for artificial DVF generation
+    DVFs_artificial_components = dimreduction(DVFs=DVFs_inverse)
+    
+    return DVFs_artificial_components, img_to_atlas, DVFs
+
+def data_augm_generation(DVFs_artificial_components, img_to_atlas=None, img_data=None, sigma=500, num_images=3, DVFs=None):
+    """Generate artificial training data with on the spot
+    Contains random component sigma so imgs_artificial are never the same
+    Args:
+        DVFs_artificial_components: components necessary for DVF generation (DVF_mean, DVF_Ud) from dimreduction()
+        img_to_atlas (list with itk images): original training data registered to atlas
+        img_data: original training data (only needed) when plotting the generated images
+        sigma: random component in artificial DVF generation (500 gives noticable differences)
+        
+    """
+    # Generate artificial DVFs
+    DVFs_artificial = generate_artificial_DVFs(DVFs_artificial_components=DVFs_artificial_components, 
+                                               num_images=num_images, sigma=sigma)
+
+    # generate artificial images
+    if img_to_atlas!=None:
+        imgs_artificial = generate_artificial_imgs(img_to_atlas=img_to_atlas, DVFs_artificial_inverse=DVFs_artificial, img_data=img_data, plot=False)
+    else:
+        # img_to_atlas is not define the goal is to apply DVF_artificial_T00 to T50 images
+        imgs_to_atlas = []
+        for i in range(len(img_data)):
+            img_to_atlas = transform(DVF_itk=DVFs[i], img_moving=img_data[i], plot=False)
+            imgs_to_atlas.append(img_to_atlas)    
+        imgs_artificial = generate_artificial_imgs(img_to_atlas=imgs_to_atlas, DVFs_artificial_inverse=DVFs_artificial, img_data=img_data, plot=False)
+        
+    return imgs_artificial
+
+def plot_data_augm(imgs_artificial, num_images, title, sigma):
+    num_rows = (len(imgs_artificial) + 2) // num_images        
+    fig, axes = plt.subplots(num_rows, num_images, figsize=(num_images*3, num_rows*3))        
+    fig.suptitle("Augmented {} images with sigma={}".format(title, sigma), y=-0.95)    
+    for i, ax in enumerate(axes.flatten()):
+        if i < len(imgs_artificial):
+            ax.imshow(imgs_artificial[i][:,64,:])
+            ax.axis('off')
+        else:
+            ax.axis('off')
+    plt.tight_layout()    
+    plt.plot()
+
+if __name__ == "__main__":
+    root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
+    img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
+
+    # Data to perform augmentation on
+    IMG_DATA = img_data_T00
+    # Number of images to generate per training image
+    NUM_IMAGES_TO_GENERATE = 3
+    # Random component
+    SIGMA=15000
+
+    mode="b"
+    # Data augmentation
+    if mode=="a":
+        """ARTIFICIAL PATIENTS 1: Get DVFaT00 from T00->atlasT00->PCA apply to T00 | DVFaT50 from T50->atlasT50->PCA apply to T50"""
+        DVFs_artificial_components_T00, img_to_atlas_T00, _ = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
+        imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, img_to_atlas=img_to_atlas_T00, 
+                        img_data=img_data_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
+
+        DVFs_artificial_components_T50, img_to_atlas_T50, _ = data_augm_preprocessing(generate=True, img_data=img_data_T50)
+        imgs_artificial_T50 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T50, img_to_atlas=img_to_atlas_T50, 
+                        img_data=img_data_T50, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
+        
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50 (DVFaT50)", sigma=SIGMA)
+    
+    elif mode=="b":
+        """ARTIFICIAL PATIENTS 2: Get DVFaT00 from T00->atlas->PCA and apply it to T00 and T50 for new image pairs"""
+        DVFs_artificial_components_T00, img_to_atlas_T00, DVFs_T00 = data_augm_preprocessing(generate=False, img_data=img_data_T00)
+        imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, img_to_atlas=img_to_atlas_T00, 
+                        img_data=img_data_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
+        
+        imgs_artificial_T50 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, 
+                        img_data=img_data_T50, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE, DVFs=DVFs_T00)
+        
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50 (DVFaT00)", sigma=SIGMA)
+
+
+    elif mode=="c":
+        """ARTIFICIAL EXPIRATION: Get DVFaT00 from T00->atlas->PCA and DVFaT50 from T50->atlas->PCA and both apply to T00"""
+        DVFs_artificial_components_T00, img_to_atlas_T00, _ = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
+        imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, img_to_atlas=img_to_atlas_T00, 
+                        img_data=img_data_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
+
+        DVFs_artificial_components_T50, img_to_atlas_T50, _ = data_augm_preprocessing(generate=True, img_data=img_data_T50)
+        
+        #apply DVFaT50 to T00a for artificial expiration
+        imgs_artificial_T00_EXP = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T50, img_to_atlas=imgs_artificial_T00, 
+                        img_data=imgs_artificial_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
+        
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00_EXP, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00+DVFaT50)", sigma=SIGMA)
