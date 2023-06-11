@@ -287,6 +287,7 @@ def plot_data_augm(imgs_artificial, num_images, title, sigma):
 
 if __name__ == "__main__":
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
+    root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
     img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
 
     # Data to perform augmentation on

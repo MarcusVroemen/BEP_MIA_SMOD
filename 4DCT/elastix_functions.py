@@ -1,29 +1,9 @@
 import itk
-# Import the required libraries
-# import elastix
-# import imageio
 import matplotlib.pyplot as plt
-from matplotlib import colors, rcParams
-# import seaborn as sns
-# import scipy.stats as stats
-# import openpyxl
 import nibabel as nib
 import random
-import os
-import sys
-from glob import glob
-from sklearn.decomposition import PCA
-
-import torch
-import torch.nn.functional as F
-
-import torch.utils.data
 from matplotlib import pyplot as plt
-from tqdm import tqdm
 import numpy as np
-import SimpleITK as sitk
-import cv2
-
 
 def registration(fixed_image, moving_image, method="rigid", plot=False, 
                  parameter_path=None, output_directory=""):

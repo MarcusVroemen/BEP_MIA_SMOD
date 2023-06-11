@@ -121,9 +121,9 @@ if __name__ == "__main__":
                        similarity_loss, smooth_loss)
 
         # Save the model each epoch
+        epoch += 1
         if args.mode_neptune != 'debug' and epoch % 5 == 0:
             save_model(model, args, epoch, run)
-        epoch += 1
 
     df = pd.DataFrame(metrics)
     csv_path = '{}/csv/{}_{}_ep-{:04d}.csv'.format(args.root_output, args.run_nr, args.network, epoch - 1)
