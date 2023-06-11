@@ -21,15 +21,16 @@ def registration(fixed_image, moving_image, method="rigid", plot=False,
     if parameter_path != None:
         parameter_object.AddParameterFile(parameter_path)    #e.g. Par007.txt
     else:
-        parameter_map = parameter_object.GetDefaultParameterMap(method)  # rigid
-        parameter_object.AddParameterMap(parameter_map)
+        # parameter_map = parameter_object.GetDefaultParameterMap(method)  # rigid
+        # parameter_object.AddParameterMap(parameter_map)
+        parameter_object.SetParameterMap(parameter_object.GetDefaultParameterMap(method))
     # print(parameter_object)
 
     # Registration
     result_image, result_transform_parameters = itk.elastix_registration_method(
         fixed_image, moving_image,
-        parameter_object=parameter_object,
-        number_of_threads=8, log_to_console=True, output_directory=output_directory)
+        parameter_object=parameter_object, #number_of_threads=8, 
+        log_to_console=True, output_directory=output_directory)
 
     # Deformation field
     deformation_field = itk.transformix_deformation_field(moving_image, result_transform_parameters)

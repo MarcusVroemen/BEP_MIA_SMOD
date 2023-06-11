@@ -282,23 +282,41 @@ def data_augm_generation(DVFs_artificial_components, imgs_to_atlas=None, img_dat
         
     return imgs_artificial
 
-def plot_data_augm(imgs_artificial, num_images, title, sigma):
+def plot_data_augm(imgs_artificial, imgs_original, num_images, title, sigma, neg=False):
     num_rows = (len(imgs_artificial) + 2) // num_images        
-    fig, axes = plt.subplots(num_rows, num_images, figsize=(num_images*3, num_rows*3))        
-    fig.suptitle("Augmented {} images with sigma={}".format(title, sigma), y=1)    
+    fig, axes = plt.subplots(num_rows, num_images+1, figsize=(num_images*3, num_rows*2.5))        
+    fig.suptitle("Augmented {} images with sigma={}".format(title, sigma), y=1)  
+    i_original=0
+    i_artificial=0  
     for i, ax in enumerate(axes.flatten()):
-        if i < len(imgs_artificial):
-            ax.imshow(imgs_artificial[i][:,64,:])
+        if i%(num_images+1)==0:
+            ax.imshow(imgs_original[i_original][:,64,:])
             ax.axis('off')
-        else:
+            ax.set_title("Original image", fontsize=15)
+            i_original+=1
+        elif neg==False:
+            ax.imshow(imgs_artificial[i_artificial][:,64,:])
             ax.axis('off')
+            ax.set_title("Artificial image", fontsize=15)
+            i_artificial+=1  
+        elif neg==True:
+            imgs=(imgs_artificial[i_artificial]) - np.asarray(imgs_original[i_original-1])
+            ax.imshow(imgs[:,64,:])
+            ax.axis('off')
+            ax.set_title("Artificial - original", fontsize=13)
+            i_artificial+=1    
     plt.tight_layout()    
     plt.plot()
+
 
 if __name__ == "__main__":
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
     root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
     img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
+
+    parameter_path_base =  "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
+    parameter_path_base =  "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
+    parameter_file = "Par0049.txt"
 
     # Data to perform augmentation on
     IMG_DATA = img_data_T00
@@ -306,6 +324,7 @@ if __name__ == "__main__":
     NUM_IMAGES_TO_GENERATE = 3
     # Random component
     SIGMA=15000
+    SIGMA2=10000
 
     mode="test"
     # Data augmentation
@@ -368,28 +387,42 @@ if __name__ == "__main__":
         plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T00 (DVFaT00+DVFaT50)", sigma=SIGMA)
 
     elif mode=="test":
+        # STEP 1
         DVFs_artificial_components_T00, imgs_to_atlas_T00, _ = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
         imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
                         img_data=img_data_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00)", sigma=SIGMA, neg=True)
         
-        
-        #register T00 to T50 with bspline to get the breathing motion
-        DVFs_EXP=[]
+        # STEP 2
+        # register T00 to T50 with bspline to get the breathing motion
+        DVFs_EXP_bspline=[]
         for i in range(len(img_data_T00)):
-            parameter_path_base =  "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
-            parameter_file = "Par0007.txt"
             result_image, DVF_EXP, result_transform_parameters = EF.registration(
                 fixed_image=img_data_T50[i], moving_image=img_data_T00[i], 
-                method="affine", plot=True, parameter_path=parameter_path_base+parameter_file)
-            DVFs_EXP.append(DVF_EXP)
+                method="bspline", plot=True)#, parameter_path=parameter_path_base+parameter_file)
+            DVFs_EXP_bspline.append(DVF_EXP)
+        DVFs_EXP_affine=[]
+        for i in range(len(img_data_T00)):
+            result_image, DVF_EXP, result_transform_parameters = EF.registration(
+                fixed_image=img_data_T50[i], moving_image=img_data_T00[i], 
+                method="affine", plot=True)#, parameter_path=parameter_path_base+parameter_file)
+            DVFs_EXP_affine.append(DVF_EXP)
 
         # generate artificial DVFs that model breathing motion from T00 to T50
-        DVFs_artificial_components_EXP = dimreduction(DVFs=DVFs_EXP)
+        DVFs_artificial_components_EXP = dimreduction(DVFs=DVFs_EXP_bspline)
         DVFs_artificial_EXP = generate_artificial_DVFs(DVFs_artificial_components=DVFs_artificial_components_EXP, 
-                                               num_images=NUM_IMAGES_TO_GENERATE, sigma=SIGMA)
+                                               num_images=NUM_IMAGES_TO_GENERATE, sigma=SIGMA2)
 
-        # apply breathing motion to artificial T00s
+
+
+        # apply artificial breathing motion to artificial T00s - bspline
         imgs_artificial = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00, DVFs_artificial_inverse=DVFs_artificial_EXP, img_data=img_data_T00, plot=True)
-
-        plot_data_augm(imgs_artificial=imgs_artificial, num_images=NUM_IMAGES_TO_GENERATE, title="T50a (DVFa-insp on T00a)", sigma=10000)
+        plot_data_augm(imgs_artificial=imgs_artificial, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a)", sigma=SIGMA2, neg=True)
+        # apply artificial breathing motion to artificial T00s - affine
+        imgs_artificial = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00, DVFs_artificial_inverse=DVFs_artificial_EXP, img_data=img_data_T00, plot=True)
+        plot_data_augm(imgs_artificial=imgs_artificial, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with affine on T00a)", sigma=SIGMA2, neg=True)
+        
+        
+        # apply original breathing motion to artificial T00s
+        imgs_artificial = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00, DVFs_artificial_inverse=DVFs_EXP_bspline, img_data=img_data_T00, plot=True)
+        plot_data_augm(imgs_artificial=imgs_artificial, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVF-EXP on T00a)", sigma="_", neg=True)
