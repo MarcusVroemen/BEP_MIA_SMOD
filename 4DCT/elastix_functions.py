@@ -83,6 +83,7 @@ def plot_registration(fixed_image, moving_image, result_image, deformation_field
         axs[1, 0].set_title(name3)
         axs[1, 1].imshow(deformation_field[:, 64, :, 2], cmap='gray')
         axs[1, 1].set_title(name4)
+        fig.suptitle("In- and output of registration - frontal")
 
     elif full==True:
         fig, axs = plt.subplots(2, 6, figsize=(30, 10), dpi=80) #, dpi=80
@@ -113,7 +114,7 @@ def plot_registration(fixed_image, moving_image, result_image, deformation_field
         axs[1, 4].set_title(name3)
         axs[1, 5].imshow(deformation_field[:, :, 64, 1], cmap='gray')
         axs[1, 5].set_title(name4)
-    fig.suptitle(title)
+        fig.suptitle(title)
     plt.tight_layout()
     plt.show()
 
@@ -180,5 +181,6 @@ def generate_atlas(img_data):
         if (L2_last - L2) <= 1:
             break
     
-    print("Atlas generation complete")
+    print("Atlas generation complete/n")
     return An
+
