@@ -18,7 +18,7 @@ def log_dict_2_neptune(run, dict, prefix):
             pass
 
 def log_descriptives_2_neptune(run, var, values):
-    # run["eval_{}/{}_mean".format(args.mode, col)] = metrics[col].mean()
+    run["eval_{}/{}_mean".format(args.mode, col)] = metrics[col].mean()
     run[var + "_mean"] = values.mean()
     run[var + "_median"] = values.median()
     run[var + "_std"] = values.std()
@@ -38,8 +38,8 @@ def init_neptune(args):
 def re_init_neptune(args):
     run = neptune.init_run(project='marcusvroemen/ViT-{}'.format(args.dataset),
                            api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJlMjhiYTdiYS02ZDk1LTQ3ZWEtYThjMC03MTAzNzg4MGRkZTQifQ==',
-                           with_id=f'V{args.dataset[0].capitalize()}-{args.run_nr}')
-                        #    with_id=f'VIT-{args.run_nr}')
+                           with_id=f'VIT-{args.run_nr}')
+                        #    with_id=f'V{args.dataset[0].capitalize()}-{args.run_nr}')
     args.run_nr = run['sys/id'].fetch()
     args.N = run['dataset/size'].fetch() #!
 
