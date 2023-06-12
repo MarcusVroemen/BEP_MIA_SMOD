@@ -201,10 +201,13 @@ def generate_artificial_imgs(imgs_to_atlas, DVFs_artificial_inverse, img_data=""
         plot: plots original, to-atlas and artificial image
     """
     imgs_artificial = []
+    counter=0
     for i in range(len(imgs_to_atlas)):
         for j in range(len(DVFs_artificial_inverse)):
             img_artificial = transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=imgs_to_atlas[i], plot=False)
             imgs_artificial.append(img_artificial)
+            counter+=1
+            print("Image {}/{} created".format(counter, len(imgs_to_atlas)*len(DVFs_artificial_inverse)))
             if plot:
                 EF.plot_registration(fixed_image=img_data[i], moving_image=imgs_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
                                     name1="T00 original", name2="T00 to atlas", name3="artificial T00", name4="artificial DVF",
@@ -253,7 +256,7 @@ def data_augm_preprocessing(img_data, generate=True):
     
     return DVFs_artificial_components, imgs_to_atlas, DVFs
 
-def data_augm_generation(DVFs_artificial_components, imgs_to_atlas=None, img_data=None, sigma=500, num_images=3, DVFs=None):
+def data_augm_generation(DVFs_artificial_components, imgs_to_atlas=None, img_data=None, sigma=1500, num_images=3, DVFs=None, plot=True):
     """Generate artificial training data with on the spot
     Contains random component sigma so imgs_artificial are never the same
     Args:
@@ -268,24 +271,35 @@ def data_augm_generation(DVFs_artificial_components, imgs_to_atlas=None, img_dat
     DVFs_artificial = generate_artificial_DVFs(DVFs_artificial_components=DVFs_artificial_components, 
                                                num_images=num_images, sigma=sigma)
 
+    if plot:
+        img_grid = np.zeros((160, 128, 160))
+        line_interval = 5  # Adjust this value to change the interval between lines
+        img_grid[:, ::line_interval, :] = 1
+        img_grid[:, :, ::line_interval] = 1
+        img_grid[::line_interval, :, :] = 1
+        for i in range(len(DVFs_artificial)):
+            transform(DVFs_artificial[i], img_grid, plot=True)
+    
     # generate artificial images
     print("Generating artificial images")
     if imgs_to_atlas!=None:
         imgs_artificial = generate_artificial_imgs(imgs_to_atlas=imgs_to_atlas, DVFs_artificial_inverse=DVFs_artificial, img_data=img_data, plot=False)
+    
     else:
         # imgs_to_atlas is not define the goal is to apply DVF_artificial_T00 to T50 images
+        print("No imgs to transform given (img_to_atlas) so transforming img_data with DVFs to create T50_to_atlas")
         imgs_to_atlas_alternative = []
         for i in range(len(img_data)):
             img_to_atlas_alternative = transform(DVF_itk=DVFs[i], img_moving=img_data[i], plot=False)
-            imgs_to_atlas_alternative.append(img_to_atlas_alternative)    
-        imgs_artificial = generate_artificial_imgs(imgs_to_atlas=img_to_atlas_alternative, DVFs_artificial_inverse=DVFs_artificial, img_data=img_data, plot=False)
+            imgs_to_atlas_alternative.append(img_to_atlas_alternative)  
+        imgs_artificial = generate_artificial_imgs(imgs_to_atlas=imgs_to_atlas_alternative, DVFs_artificial_inverse=DVFs_artificial, img_data=img_data, plot=False)
         
     return imgs_artificial
 
-def plot_data_augm(imgs_artificial, imgs_original, num_images, title, sigma, neg=False):
+def plot_data_augm(imgs_artificial, imgs_original, num_images, title, neg=False):
     num_rows = (len(imgs_artificial) + 2) // num_images        
     fig, axes = plt.subplots(num_rows, num_images+1, figsize=(num_images*3, num_rows*2.5))        
-    fig.suptitle("Augmented {} images with sigma={}".format(title, sigma), y=1)  
+    fig.suptitle(title, y=1)  
     i_original=0
     i_artificial=0  
     for i, ax in enumerate(axes.flatten()):
@@ -308,14 +322,28 @@ def plot_data_augm(imgs_artificial, imgs_original, num_images, title, sigma, neg
     plt.tight_layout()    
     plt.plot()
 
+def plot_data_augmpairs(imgs_artificial_1, imgs_artificial_2, title):
+    fig, axes = plt.subplots(len(imgs_artificial_1), 3, figsize=(3*2.5, len(imgs_artificial_1)*3))        
+    fig.suptitle(title, y=1)  
+    for i in range(len(imgs_artificial_1)):
+        axes[i,0].imshow(imgs_artificial_1[i][:,64,:])
+        axes[i,1].imshow(imgs_artificial_2[i][:,64,:])
+        img_neg=np.asarray(imgs_artificial_1[i]) - np.asarray(imgs_artificial_2[i])
+        axes[i,2].imshow(img_neg[:,64,:])
+        axes[i,0].axis('off')
+        axes[i,1].axis('off')
+        axes[i,2].axis('off') 
+    plt.tight_layout()    
+    plt.plot()
+
 
 if __name__ == "__main__":
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
-    root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
+    # root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
     img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
 
     parameter_path_base =  "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
-    parameter_path_base =  "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
+    # parameter_path_base =  "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
     parameter_file = "Par0049.txt"
 
     # Data to perform augmentation on
@@ -326,7 +354,7 @@ if __name__ == "__main__":
     SIGMA=15000
     SIGMA2=10000
 
-    mode="test"
+    mode="b"
     # Data augmentation
     if mode=="a":
         """ARTIFICIAL PATIENTS 1: Get DVFaT00 from T00->atlasT00->PCA apply to T00 | DVFaT50 from T50->atlasT50->PCA apply to T50"""
@@ -338,13 +366,13 @@ if __name__ == "__main__":
         imgs_artificial_T50 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T50, imgs_to_atlas=imgs_to_atlas_T50, 
                         img_data=img_data_T50, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
         
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00)", sigma=SIGMA)
-        plot_data_augm(imgs_artificial=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50 (DVFaT50)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) sigma={}".format(SIGMA))
+        plot_data_augm(imgs_artificial=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50 (DVFaT50) sigma={}".format(SIGMA))
     
         imgs_artificial_DIF=[]
         for i in range(len(imgs_artificial_T00)):
             imgs_artificial_DIF.append(np.asarray(imgs_artificial_T00[i])-np.asarray(imgs_artificial_T50[i]))
-        plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T50 (DVFaT50)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T50 (DVFaT50) sigma={}".format(SIGMA))
 
 
     elif mode=="b":
@@ -352,17 +380,27 @@ if __name__ == "__main__":
         DVFs_artificial_components_T00, imgs_to_atlas_T00, DVFs_T00 = data_augm_preprocessing(generate=False, img_data=img_data_T00)
         imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
                         img_data=img_data_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA), neg=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA), sigma=SIGMA, neg=True)
+        
         
         imgs_artificial_T50 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, 
                         img_data=img_data_T50, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE, DVFs=DVFs_T00)
         
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00)", sigma=SIGMA)
-        plot_data_augm(imgs_artificial=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50 (DVFaT00)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) sigma={}".format(SIGMA), neg=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50 (DVFaT00) sigma={}".format(SIGMA), neg=True)
+        plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50s (DVFaT00) OG=T50 sigma={}".format(SIGMA), neg=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50s (DVFaT00) OG=T50 sigma={}".format(SIGMA), neg=True)
 
-        imgs_artificial_DIF=[]
-        for i in range(len(imgs_artificial_T00)):
-            imgs_artificial_DIF.append(np.asarray(imgs_artificial_T00[i])-np.asarray(imgs_artificial_T50[i]))
-        plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T50 (DVFaT00)", sigma=SIGMA)
+        # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50s (DVFaT00) sigma={}".format(SIGMA), neg=True)
+        # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50s (DVFaT00) sigma={}".format(SIGMA), neg=False)
+
+        plot_data_augmpairs(imgs_artificial_T00, imgs_artificial_T50, title="T00a and T50a with same DVFa sigma={}".format(SIGMA))
+
+        # imgs_artificial_DIF=[]
+        # for i in range(len(imgs_artificial_T00)):
+        #     imgs_artificial_DIF.append(np.asarray(imgs_artificial_T00[i])-np.asarray(imgs_artificial_T50[i]))
+        # plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T50 (DVFaT00) sigma={}".format(SIGMA))
 
 
     elif mode=="c":
@@ -378,20 +416,21 @@ if __name__ == "__main__":
         imgs_artificial_T00_EXP = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T50, imgs_to_atlas=imgs_artificial_T00, 
                         img_data=imgs_artificial_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
         
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00)", sigma=SIGMA)
-        plot_data_augm(imgs_artificial=imgs_artificial_T00_EXP, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00+DVFaT50)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) sigma={}".format(SIGMA))
+        plot_data_augm(imgs_artificial=imgs_artificial_T00_EXP, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00+DVFaT50) sigma={}".format(SIGMA))
         
         imgs_artificial_DIF=[]
         for i in range(len(imgs_artificial_T00_EXP)):
             imgs_artificial_DIF.append(np.asarray(imgs_artificial_T00[i//NUM_IMAGES_TO_GENERATE])-np.asarray(imgs_artificial_T00_EXP[i]))
-        plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T00 (DVFaT00+DVFaT50)", sigma=SIGMA)
+        plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T00 (DVFaT00+DVFaT50) sigma={}".format(SIGMA))
 
     elif mode=="test":
         # STEP 1
-        DVFs_artificial_components_T00, imgs_to_atlas_T00, _ = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
+        DVFs_artificial_components_T00, imgs_to_atlas_T00, DVFs_T00 = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
         imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
                         img_data=img_data_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00)", sigma=SIGMA, neg=True)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA), neg=True)
+        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA), neg=False)
         
         # STEP 2
         # register T00 to T50 with bspline to get the breathing motion
@@ -408,21 +447,40 @@ if __name__ == "__main__":
                 method="affine", plot=True)#, parameter_path=parameter_path_base+parameter_file)
             DVFs_EXP_affine.append(DVF_EXP)
 
+
         # generate artificial DVFs that model breathing motion from T00 to T50
         DVFs_artificial_components_EXP = dimreduction(DVFs=DVFs_EXP_bspline)
-        DVFs_artificial_EXP = generate_artificial_DVFs(DVFs_artificial_components=DVFs_artificial_components_EXP, 
+        DVFs_artificial_EXP_baspline = generate_artificial_DVFs(DVFs_artificial_components=DVFs_artificial_components_EXP, 
+                                               num_images=NUM_IMAGES_TO_GENERATE, sigma=SIGMA2)
+        DVFs_artificial_components_EXP = dimreduction(DVFs=DVFs_EXP_affine)
+        DVFs_artificial_EXP_affine = generate_artificial_DVFs(DVFs_artificial_components=DVFs_artificial_components_EXP, 
                                                num_images=NUM_IMAGES_TO_GENERATE, sigma=SIGMA2)
 
-
-
         # apply artificial breathing motion to artificial T00s - bspline
-        imgs_artificial = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00, DVFs_artificial_inverse=DVFs_artificial_EXP, img_data=img_data_T00, plot=True)
-        plot_data_augm(imgs_artificial=imgs_artificial, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a)", sigma=SIGMA2, neg=True)
+        imgs_artificial_bapline_PCA = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00, DVFs_artificial_inverse=DVFs_artificial_EXP_baspline, img_data=img_data_T00, plot=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_bapline_PCA, imgs_original=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_bapline_PCA, imgs_original=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=True)
         # apply artificial breathing motion to artificial T00s - affine
-        imgs_artificial = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00, DVFs_artificial_inverse=DVFs_artificial_EXP, img_data=img_data_T00, plot=True)
-        plot_data_augm(imgs_artificial=imgs_artificial, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with affine on T00a)", sigma=SIGMA2, neg=True)
+        imgs_artificial_affine_PCA = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00, DVFs_artificial_inverse=DVFs_artificial_EXP_affine, img_data=img_data_T00, plot=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_affine_PCA, imgs_original=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with affine on T00a) sigma={}".format(SIGMA2), neg=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_affine_PCA, imgs_original=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with affine on T00a) sigma={}".format(SIGMA2), neg=True)
         
         
-        # apply original breathing motion to artificial T00s
-        imgs_artificial = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00, DVFs_artificial_inverse=DVFs_EXP_bspline, img_data=img_data_T00, plot=True)
-        plot_data_augm(imgs_artificial=imgs_artificial, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVF-EXP on T00a)", sigma="_", neg=True)
+        # apply original breathing motion to artificial T00s - bspline
+        imgs_artificial_bspline_OG = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00[::4][:4], DVFs_artificial_inverse=DVFs_EXP_bspline, img_data=img_data_T00, plot=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_bspline_OG, imgs_original=imgs_artificial_T00[::4][:4], num_images=9, title="T50aEXP (DVF-EXP with bspline on T00a)", sigma="_", neg=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_bspline_OG, imgs_original=imgs_artificial_T00[::4][:4], num_images=9, title="T50aEXP (DVF-EXP with bspline on T00a)", sigma="_", neg=True)
+        plot_data_augm(imgs_artificial=imgs_artificial_bspline_OG, imgs_original=imgs_artificial_T00[::4][:4], num_images=9, title="T50aEXP (DVF-EXP with bspline on T00a)", sigma="_", neg=True)
+        # apply original breathing motion to artificial T00s - affine
+        imgs_artificial_affine_OG = generate_artificial_imgs(imgs_to_atlas=imgs_artificial_T00[::4][:4], DVFs_artificial_inverse=DVFs_EXP_affine, img_data=img_data_T00, plot=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_affine_OG, imgs_original=imgs_artificial_T00[::4][:4], num_images=9, title="T50aEXP (DVF-EXP with affine on T00a)", sigma="_", neg=False)
+        plot_data_augm(imgs_artificial=imgs_artificial_affine_OG, imgs_original=imgs_artificial_T00[::4][:4], num_images=9, title="T50aEXP (DVF-EXP with affine on T00a)", sigma="_", neg=True)
+        
+        # PCA op maar 1 component
+        # DVFs_artificial_components_EXP = dimreduction(DVFs=[DVFs_EXP_bspline[0],DVFs_EXP_bspline[0]])
+        # DVFs_artificial_EXP_baspline = generate_artificial_DVFs(DVFs_artificial_components=DVFs_artificial_components_EXP, 
+        #                                        num_images=NUM_IMAGES_TO_GENERATE, sigma=SIGMA2)
+        
+        # DVFa van T00a op T50
+        # imgs_artificial_T50 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, 
+        #                 img_data=img_data_T50, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE, DVFs=_)
