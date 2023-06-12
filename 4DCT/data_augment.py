@@ -387,119 +387,47 @@ def plot_data_augmpairs(imgs_artificial_1, imgs_artificial_2, title):
 
 def write_augmented_data(path, foldername, imgs_T00a, imgs_T50a):
     img = nib.load(path+'train/image/case_001/T00.nii.gz')
-    for i in range(len(imgs_artificial_T00)):
+    for i in range(len(imgs_T00a)):
+        folder_path = os.path.join(path,foldername,"image", str(i))
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+            
         img_nib = nib.Nifti1Image(imgs_T00a[i], img.affine)
-        nib.save(img_nib, os.path.join(root_data,foldername, 'T00_{}.nii.gz'.format(i)))
+        nib.save(img_nib, os.path.join(folder_path, 'T00.nii.gz'))
         img_nib = nib.Nifti1Image(imgs_T50a[i], img.affine)
-        nib.save(img_nib, os.path.join(root_data,foldername, 'T50_{}.nii.gz'.format(i)))
+        nib.save(img_nib, os.path.join(folder_path, 'T50.nii.gz'))
 
 if __name__ == "__main__":
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
     # root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
+    
     img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
 
-    parameter_path_base =  "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
-    # parameter_path_base =  "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
-    parameter_file = "Par0049.txt"
-
-    # Data to perform augmentation on
-    IMG_DATA = img_data_T00
     # Number of images to generate per training image
     NUM_IMAGES_TO_GENERATE = 3
     # Random component
     SIGMA1=15000
     SIGMA2=1500
 
-    mode="test"
-    # Data augmentation
-    if mode=="a":
-        """ARTIFICIAL PATIENTS 1: Get DVFaT00 from T00->atlasT00->PCA apply to T00 | DVFaT50 from T50->atlasT50->PCA apply to T50"""
-        DVFs_artificial_components_T00, imgs_to_atlas_T00, _ = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
-        imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
-                        img_data=img_data_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
 
-        DVFs_artificial_components_T50, imgs_to_atlas_T50, _ = data_augm_preprocessing(generate=True, img_data=img_data_T50)
-        imgs_artificial_T50 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T50, imgs_to_atlas=imgs_to_atlas_T50, 
-                        img_data=img_data_T50, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
-        
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) sigma={}".format(SIGMA))
-        plot_data_augm(imgs_artificial=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50 (DVFaT50) sigma={}".format(SIGMA))
+    # STEP 1
+    DVFs_artificial_components_T00, imgs_to_atlas_T00, DVFs_T00 = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
+    imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
+                    img_data=img_data_T00, sigma=SIGMA1, num_images=NUM_IMAGES_TO_GENERATE)
+    plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA1), neg=True)
+    plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA1), neg=False)
     
-        imgs_artificial_DIF=[]
-        for i in range(len(imgs_artificial_T00)):
-            imgs_artificial_DIF.append(np.asarray(imgs_artificial_T00[i])-np.asarray(imgs_artificial_T50[i]))
-        plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T50 (DVFaT50) sigma={}".format(SIGMA))
+    # STEP 2
+    imgs_artificial_T50 = data_augm_breathing(imgs_T00=img_data_T00, imgs_T50=img_data_T50, imgs_T00a=imgs_artificial_T00, 
+                                                sigma=SIGMA2, num_images=NUM_IMAGES_TO_GENERATE, plot=True)
+    plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=False)
+    # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=True)
+    
+    plot_data_augmpairs(imgs_artificial_T00, imgs_artificial_T50, title="T00a and T50a with same DVFa sigma={}|{}".format(SIGMA1, SIGMA2))
+    plot_data_augmpairs(img_data_T00, img_data_T50, title="T00 and T50 original")
 
-
-    elif mode=="b":
-        """ARTIFICIAL PATIENTS 2: Get DVFaT00 from T00->atlas->PCA and apply it to T00 and T50 for new image pairs"""
-        DVFs_artificial_components_T00, imgs_to_atlas_T00, DVFs_T00 = data_augm_preprocessing(generate=False, img_data=img_data_T00)
-        imgs_artificial_T00, imgs_artificial_T50 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
-                        img_data=img_data_T00, DVFs=DVFs_T00, imgs_T50=img_data_T50,
-                        sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
-        
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA), neg=False)
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA), neg=True)
-        plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50s (DVFaT00) OG=T50 sigma={}".format(SIGMA), neg=False)
-        plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50s (DVFaT00) OG=T50 sigma={}".format(SIGMA), neg=True)
-        
-        
-        # imgs_artificial_T50 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, 
-        #                 img_data=img_data_T50, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE, DVFs=DVFs_T00)
-        
-        # plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) sigma={}".format(SIGMA), neg=False)
-        # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50 (DVFaT00) sigma={}".format(SIGMA), neg=True)
-
-        # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50s (DVFaT00) sigma={}".format(SIGMA), neg=True)
-        # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T50s (DVFaT00) sigma={}".format(SIGMA), neg=False)
-
-        plot_data_augmpairs(imgs_artificial_T00, imgs_artificial_T50, title="T00a and T50a with same DVFa sigma={}".format(SIGMA))
-
-        # imgs_artificial_DIF=[]
-        # for i in range(len(imgs_artificial_T00)):
-        #     imgs_artificial_DIF.append(np.asarray(imgs_artificial_T00[i])-np.asarray(imgs_artificial_T50[i]))
-        # plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T50 (DVFaT00) sigma={}".format(SIGMA))
-
-
-    elif mode=="c":
-        """ARTIFICIAL EXPIRATION: Get DVFaT00 from T00->atlas->PCA and DVFaT50 from T50->atlas->PCA and both apply to T00"""
-        DVFs_artificial_components_T00, imgs_to_atlas_T00, _ = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
-        imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
-                        img_data=img_data_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
-
-        DVFs_artificial_components_T50, imgs_to_atlas_T50, _ = data_augm_preprocessing(generate=True, img_data=img_data_T50)
-        
-        #apply DVFaT50 to T00a for artificial expiration
-        #3*3 synthetic T50a are created for every 3 T00a
-        imgs_artificial_T00_EXP = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T50, imgs_to_atlas=imgs_artificial_T00, 
-                        img_data=imgs_artificial_T00, sigma=SIGMA, num_images=NUM_IMAGES_TO_GENERATE)
-        
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) sigma={}".format(SIGMA))
-        plot_data_augm(imgs_artificial=imgs_artificial_T00_EXP, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00+DVFaT50) sigma={}".format(SIGMA))
-        
-        imgs_artificial_DIF=[]
-        for i in range(len(imgs_artificial_T00_EXP)):
-            imgs_artificial_DIF.append(np.asarray(imgs_artificial_T00[i//NUM_IMAGES_TO_GENERATE])-np.asarray(imgs_artificial_T00_EXP[i]))
-        plot_data_augm(imgs_artificial=imgs_artificial_DIF, num_images=NUM_IMAGES_TO_GENERATE, title="T00 (DVFaT00) - T00 (DVFaT00+DVFaT50) sigma={}".format(SIGMA))
-
-    elif mode=="test":
-        # STEP 1
-        DVFs_artificial_components_T00, imgs_to_atlas_T00, DVFs_T00 = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
-        imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
-                        img_data=img_data_T00, sigma=SIGMA1, num_images=NUM_IMAGES_TO_GENERATE)
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA1), neg=True)
-        plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA1), neg=False)
-        
-        # STEP 2
-        imgs_artificial_T50 = data_augm_breathing(imgs_T00=img_data_T00, imgs_T50=img_data_T50, imgs_T00a=imgs_artificial_T00, 
-                                                  sigma=SIGMA2, num_images=NUM_IMAGES_TO_GENERATE, plot=True)
-        plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=False)
-        # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=True)
-        
-        plot_data_augmpairs(imgs_artificial_T00, imgs_artificial_T50, title="T00a and T50a with same DVFa sigma={}|{}".format(SIGMA1, SIGMA2))
-        plot_data_augmpairs(img_data_T00, img_data_T50, title="T00 and T50 original")
-
-        write_augmented_data(path=root_data, foldername="artificial3", 
-                             imgs_T00a=imgs_artificial_T00, imgs_T50a=imgs_artificial_T50)
+    # Write data
+    write_augmented_data(path=root_data, foldername="artificial_N{}_S{}_{}".format(NUM_IMAGES_TO_GENERATE, SIGMA1, SIGMA2), 
+                            imgs_T00a=imgs_artificial_T00, imgs_T50a=imgs_artificial_T50)
 
 

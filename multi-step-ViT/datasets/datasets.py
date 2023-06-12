@@ -121,7 +121,7 @@ class DatasetLung(Dataset):
                         self.phases_fixed.append(i)
                         self.phases_moving.append(j)
 
-        if self.train_val_test != 'train':
+        if self.train_val_test != ('train' or 'artificial'):
             self.phases_fixed = [0]
             self.phases_moving = [50]
 
