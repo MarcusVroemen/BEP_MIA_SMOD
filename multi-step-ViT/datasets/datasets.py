@@ -87,7 +87,7 @@ class Dataset(torch.utils.data.Dataset):
         return moving_t, fixed_t
 
 class DatasetLung(Dataset):
-    def __init__(self, train_val_test, version, root_data, phases='in_ex'):
+    def __init__(self, train_val_test, version, root_data, folder_augment=None, phases='in_ex'):
         super().__init__(train_val_test)
         self.set = 'lung'
         self.extension = '.nii.gz'
@@ -99,8 +99,10 @@ class DatasetLung(Dataset):
         # self.landmarks_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/landmarks/***'
         self.img_folder = f'{root_data}/{train_val_test}/image/***'
         self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
-        # self.img_folder = f'/mnt/sda/DATA/LUNG_4DCT/DATA/PREPROCESSED/PREPROCESSED_V2.1/splitA/{train_val_test}/image/***'
-        # self.landmarks_folder = f'/mnt/sda/DATA/LUNG_4DCT/DATA/PREPROCESSED/PREPROCESSED_V2.1/splitA/{train_val_test}/landmarks/***'
+        if folder_augment!=None:
+            self.img_folder_augment = f'{root_data}/{folder_augment}/image/***'
+        else:
+            self.img_folder_augment = None
         self.init_paths()
         self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
         self.offsets = [0, 0, 0] #!
@@ -126,7 +128,10 @@ class DatasetLung(Dataset):
             self.phases_moving = [50]
 
         # Get all file names inside the data folder
-        self.img_paths, self.landmarks_paths = glob(self.img_folder), glob(self.landmarks_folder)
+        if self.img_folder_augment!=None:
+            self.img_paths, self.landmarks_paths = glob(self.img_folder)+glob(self.img_folder_augment), glob(self.landmarks_folder)
+        else:
+            self.img_paths, self.landmarks_paths = glob(self.img_folder), glob(self.landmarks_folder)
         self.img_paths.sort()
         self.landmarks_paths.sort()
         self.fixed_img, self.moving_img = [], []

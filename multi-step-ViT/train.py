@@ -50,14 +50,14 @@ parser.add_argument('-loss', '--similarity_loss', type=str, metavar='', default=
                     help='similarity loss | nmi | ncc ')
 parser.add_argument('-lr', '--learning_rate', type=float, metavar='', default=1e-4, help='learning rate')
 parser.add_argument("-rw", '--reg_weight', type=float, metavar='', default=1, help='regularization (smoothing) weight')
-parser.add_argument('-ep', '--epochs', type=int, metavar='', default=10, help='nr of epochs you want to train on')
+parser.add_argument('-ep', '--epochs', type=int, metavar='', default=50, help='nr of epochs you want to train on')
 parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
                     help='batch size you want to use during training')
 
 # Dataset
 parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', help='dataset')
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none')
-parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD')
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
 # parser.add_argument('augmentation', choices=['none', 'SMOD', 'gryds'])  #!
 parser.add_argument('-v', '--version', type=str, metavar='', default='', help='preprocessing version')
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
@@ -80,9 +80,9 @@ if __name__ == "__main__":
             train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
             val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
         elif args.augmentation == 'SMOD':
-            train_dataset = DatasetLung('artificial', root_data=args.root_data, version=args.version)
+            train_dataset = DatasetLung('train', folder_augment="artificial_N5_S10000_1000", root_data=args.root_data, version=args.version)
             val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
-
+    print("Training dataset size: ", len(train_dataset))
     train_dataset.adjust_shape(multiple_of=32)
     val_dataset.adjust_shape(multiple_of=32)
     if args.overfit:

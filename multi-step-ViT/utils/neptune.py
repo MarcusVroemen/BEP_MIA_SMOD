@@ -27,7 +27,7 @@ def log_descriptives_2_neptune(run, var, values):
 
 def init_neptune(args):
     run = neptune.init_run(project='marcusvroemen/ViT-{}'.format(args.dataset),
-                           source_files=['*.py', 'utils/*.py', 'model/***', 'datasets/*.py', 'evaluation/*.py', 'executor/*.py'],
+                           source_files=['BEP_MIA_DIR/multi-step-ViT/*.py', 'BEP_MIA_DIR/multi-step-ViT/utils/*.py', 'BEP_MIA_DIR/multi-step-ViT/model/***', 'BEP_MIA_DIR/multi-step-ViT/datasets/*.py', 'BEP_MIA_DIR/multi-step-ViT/evaluation/*.py', 'BEP_MIA_DIR/multi-step-ViT/executor/*.py', "BEP_MIA_DIR/multi-step-ViT/train.py"],
                            api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJlMjhiYTdiYS02ZDk1LTQ3ZWEtYThjMC03MTAzNzg4MGRkZTQifQ==',
                            mode=args.mode_neptune)
     run["parameters"] = vars(args)
@@ -39,7 +39,6 @@ def re_init_neptune(args):
     run = neptune.init_run(project='marcusvroemen/ViT-{}'.format(args.dataset),
                            api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJlMjhiYTdiYS02ZDk1LTQ3ZWEtYThjMC03MTAzNzg4MGRkZTQifQ==',
                            with_id=f'VIT-{args.run_nr}')
-                        #    with_id=f'V{args.dataset[0].capitalize()}-{args.run_nr}')
     args.run_nr = run['sys/id'].fetch()
     args.N = run['dataset/size'].fetch() #!
 

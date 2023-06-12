@@ -51,7 +51,7 @@ def save_model(model, args, epoch, run=None):
     except AttributeError:
         state_dict = model.state_dict()
     torch.save(state_dict, model_path)
-    # run["model/path"] = model_path
+    run["model/path"] = model_path
 
 class ScaledTanH(torch.nn.Module):
     def __init__(self, scaling):
