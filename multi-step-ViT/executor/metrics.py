@@ -22,7 +22,7 @@ def jacobian_det(displacement):
     return det, neg.item(), folding_perc.item(), jac_det_std.item()
 
 def tre(points_1, points_2, elementspacing):
-    element_wise_difference = (points_1 - points_2) * torch.tensor(elementspacing.copy())
+    element_wise_difference = (points_1.to("cuda") - points_2.to("cuda")) * torch.tensor(elementspacing.copy()).to("cuda") #!
     tre = torch.mean(torch.sqrt(torch.nansum(element_wise_difference ** 2, -1)))
     tre_std = torch.std(torch.sqrt(torch.nansum(element_wise_difference ** 2, -1)))
     return tre.item(), tre_std.item()
@@ -133,7 +133,7 @@ def get_metrics_dict(dict, image_1, image_2, label_1, label_2, points_1, points_
 
     # Dices and HD
 
-    if label_1!=None: #!no mask
+    if label_1!=None:
         if label_1.sum().item() > 0 and label_2.sum().item() > 0:
             dices = multiclass_dsc(label_1, label_2)
             hd_95 = multiclass_hd95(label_1.cpu().squeeze().numpy(),

@@ -388,7 +388,7 @@ def plot_data_augmpairs(imgs_artificial_1, imgs_artificial_2, title):
 def write_augmented_data(path, foldername, imgs_T00a, imgs_T50a):
     img = nib.load(path+'train/image/case_001/T00.nii.gz')
     for i in range(len(imgs_T00a)):
-        folder_path = os.path.join(path,foldername,"image", str(i))
+        folder_path = os.path.join(path,foldername,"image", str(i).zfill(3))
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
             
@@ -398,8 +398,8 @@ def write_augmented_data(path, foldername, imgs_T00a, imgs_T50a):
         nib.save(img_nib, os.path.join(folder_path, 'T50.nii.gz'))
 
 if __name__ == "__main__":
-    root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
-    # root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
+    # root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
+    root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
     
     img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
 
