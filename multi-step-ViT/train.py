@@ -56,11 +56,13 @@ parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
 
 # Dataset
 parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', help='dataset')
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
-# parser.add_argument('augmentation', choices=['none', 'SMOD', 'gryds'])  #!
 parser.add_argument('-v', '--version', type=str, metavar='', default='', help='preprocessing version')
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
+#* Data augmentation 
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
+folder_augment="artificial_N5_S10000_1000"
+
 args = parser.parse_args()
 print(vars(args))
 set_seed(args.random_seed)
@@ -80,7 +82,7 @@ if __name__ == "__main__":
             train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
             val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
         elif args.augmentation == 'SMOD':
-            train_dataset = DatasetLung('train', folder_augment="artificial_N5_S10000_1000", root_data=args.root_data, version=args.version)
+            train_dataset = DatasetLung('train', folder_augment=folder_augment, root_data=args.root_data, version=args.version)
             val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
     print("Training dataset size: ", len(train_dataset))
     train_dataset.adjust_shape(multiple_of=32)
