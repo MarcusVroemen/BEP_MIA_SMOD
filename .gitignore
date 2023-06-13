@@ -9,3 +9,4 @@ archive/
 multi-step-ViT/checkpoints/
 *.raw
 logs/
+4DCT/data/artificial/*
