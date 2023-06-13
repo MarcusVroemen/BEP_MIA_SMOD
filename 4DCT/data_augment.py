@@ -404,10 +404,11 @@ if __name__ == "__main__":
     img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
 
     # Number of images to generate per training image
-    NUM_IMAGES_TO_GENERATE = 3
+    NUM_IMAGES_TO_GENERATE = 10
     # Random component
-    SIGMA1=15000
-    SIGMA2=1500
+    factor=20
+    SIGMA1=1000*factor
+    SIGMA2=100*factor
 
 
     # STEP 1
