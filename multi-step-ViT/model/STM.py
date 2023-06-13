@@ -66,7 +66,8 @@ class SpatialTransformer(nn.Module):
         displacements = flow[:, idx[:, 0].tolist(), idx[:, 1].tolist(), idx[:, 2].tolist(), :].squeeze()
         if self.unity:
             displacements = displacements * torch.Tensor(data=flow.shape[1:4]).to(flow.device)
-        points_warped = src + displacements
+        
+        points_warped = src.to(flow.device)+displacements.to(flow.device) #!
         return points_warped
 
 class DiffeomorphicTransform_unit(nn.Module):

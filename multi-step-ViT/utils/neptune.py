@@ -3,8 +3,9 @@ Neptune functions
 """
 from argparse import Namespace
 
-# import neptune.new as neptune
-import neptune
+
+import neptune.new as neptune
+
 import numpy as np
 
 def string_2_list(string_list):
@@ -18,7 +19,7 @@ def log_dict_2_neptune(run, dict, prefix):
             pass
 
 def log_descriptives_2_neptune(run, var, values):
-    # run["eval_{}/{}_mean".format(args.mode, col)] = metrics[col].mean()
+    run["eval_{}/{}_mean".format(args.mode, col)] = metrics[col].mean()
     run[var + "_mean"] = values.mean()
     run[var + "_median"] = values.median()
     run[var + "_std"] = values.std()
@@ -26,9 +27,9 @@ def log_descriptives_2_neptune(run, var, values):
     run[var + "_q90"] = values.quantile(q=0.9)
 
 def init_neptune(args):
-    run = neptune.init_run(project='#your_neptune_name#/VIT-{}'.format(args.dataset),
-                           source_files=['*.py', 'utils/*.py', 'model/***', 'datasets/*.py', 'evaluation/*.py', 'executor/*.py'],
-                           api_token='#your_neptune_token#',
+    run = neptune.init_run(project='marcusvroemen/ViT-{}'.format(args.dataset),
+                           source_files=['BEP_MIA_DIR/multi-step-ViT/*.py', 'BEP_MIA_DIR/multi-step-ViT/utils/*.py', 'BEP_MIA_DIR/multi-step-ViT/model/***', 'BEP_MIA_DIR/multi-step-ViT/datasets/*.py', 'BEP_MIA_DIR/multi-step-ViT/evaluation/*.py', 'BEP_MIA_DIR/multi-step-ViT/executor/*.py', "BEP_MIA_DIR/multi-step-ViT/train.py"],
+                           api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJlMjhiYTdiYS02ZDk1LTQ3ZWEtYThjMC03MTAzNzg4MGRkZTQifQ==',
                            mode=args.mode_neptune)
     run["parameters"] = vars(args)
     args.run_nr = run['sys/id'].fetch()
@@ -36,11 +37,11 @@ def init_neptune(args):
     return run, args, epoch
 
 def re_init_neptune(args):
-    run = neptune.init_run(project='#your_neptune_name#/VIT-{}'.format(args.dataset),
-                           api_token='#your_neptune_token#',
-                           with_id=f'V{args.dataset[0].capitalize()}-{args.run_nr}')
+    run = neptune.init_run(project='marcusvroemen/ViT-{}'.format(args.dataset),
+                           api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJlMjhiYTdiYS02ZDk1LTQ3ZWEtYThjMC03MTAzNzg4MGRkZTQifQ==',
+                           with_id=f'VIT-{args.run_nr}')
     args.run_nr = run['sys/id'].fetch()
-    args.N = run['dataset/size'].fetch()
+    args.N = run['dataset/size'].fetch() #!
 
     args_ = run['parameters'].fetch()
     args = dict(args_, **vars(args))
@@ -52,6 +53,6 @@ def re_init_neptune(args):
             pass
 
     print(args)
-    args.model_path = run['model/path'].fetch()
+    args.model_path = run['model/path'].fetch() #!
     epoch = int(args.model_path[-6:-3])
     return run, args, epoch

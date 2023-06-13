@@ -16,14 +16,17 @@ torch.backends.cudnn.benchmark = True  # speed ups
 base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
 
 
+base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
+
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - validation script')
-parser.add_argument('-run', '--run_nr', type=str, metavar='', default='None',help='device / gpu used')
+parser.add_argument('-run', '--run_nr', type=str, metavar='', default='1',help='')
 parser.add_argument('-ep', '--epochs', type=int, metavar='', default=11, help='nr of epochs you want to evaluate on')
 parser.add_argument('-dev', '--device', type=str, metavar='', default='cuda', help='device / gpu used')
-parser.add_argument('--root_output', type=str, metavar='',
-                    default=base_path+'output/model_val_metrics', help='')
+parser.add_argument('--root_output', type=str, metavar='', 
+                    default=base_path+'multi-step-ViT/output/model_val_metrics', help='') #default='/home/bme001/20210003/projects/J01_VIT/output/model_val_metrics'
 parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', help='dataset')
+
 args = parser.parse_args()
 print(vars(args))
 

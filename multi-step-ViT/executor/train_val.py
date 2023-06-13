@@ -53,11 +53,11 @@ def train_epoch(model, data_loader, optimizer, run, args,
             optimizer.step()
 
         """ Save iteration to Neptune """
-        # run["train/its/loss"].log(loss.item())
-        # run["train/its/loss_reg"].log(loss_reg.item())
+        run["train/its/loss"].log(loss.item())
+        run["train/its/loss_reg"].log(loss_reg.item())
 
     """ Save epoch to Neptune """
-    # run["train/epochs/loss"].log(total_loss / len(data_loader))
+    run["train/epochs/loss"].log(total_loss / len(data_loader))
     return total_loss / len(data_loader)
 
 
@@ -106,8 +106,8 @@ def validate_epoch(model, data_loader, run, args,
                                           dataset=data_loader.dataset)
 
     # save metrics to neptune
-    # try:
-    #     log_dict_2_neptune(run=run, dict=storage, prefix=f'{data_loader.dataset.train_val_test}/epochs')
-    # except:
-    #     pass
+    try:
+        log_dict_2_neptune(run=run, dict=storage, prefix=f'{data_loader.dataset.train_val_test}/epochs')
+    except:
+        pass
     return storage

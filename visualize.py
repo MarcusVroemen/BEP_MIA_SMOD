@@ -57,35 +57,12 @@ plt.tight_layout()
 plt.show()
 
 
-
 #%%
-from torch.utils.tensorboard import SummaryWriter
-import os, utils, glob, losses
-import sys
-from torch.utils.data import DataLoader
-from data import datasets, trans
-import numpy as np
-import torch
-from torchvision import transforms
-from torch import optim
-import torch.nn as nn
-import matplotlib.pyplot as plt
-from natsort import natsorted
-from models.TransMorph import CONFIGS as CONFIGS_TM
-import models.TransMorph as TransMorph
-# %% IXI DATASET
-atlas_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/atlas.pkl'
-train_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/Train/'
-val_dir = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/IXI_data/Val/'
-
-train_set = datasets.IXIBrainDataset(glob.glob(train_dir + '*.pkl'), atlas_dir, transforms=train_composed)
-val_set = datasets.IXIBrainInferDataset(glob.glob(val_dir + '*.pkl'), atlas_dir, transforms=val_composed)
-# train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-# val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
-
-x, y = train_set[1]
-# plt.imshow(x[0][100,:, :], cmap='gray')
-# plt.imshow(y[0][100,:, :], cmap='gray')
+data_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/deformationField_case026.nii.gz"
+data_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/deformationField.nii.gz"
+img = nib.load(data_path)
+img = img.get_fdata()
+x=img[:,:,:,0,0]
+slice_img = img[60,:,:,0,0]
+plt.imshow(x[60,:,:], cmap='gray')
 # %%
-# path = self.paths[index]
-#         x, y = pkload(path)

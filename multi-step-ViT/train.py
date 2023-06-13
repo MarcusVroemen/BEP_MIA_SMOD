@@ -8,7 +8,7 @@ from datasets.datasets import DatasetLung
 from executor.losses import Grad, NCC
 from executor.train_val import validate_epoch, train_epoch
 from model.utils import save_model, init_model#, set_level_sequential_training_2
-# from utils.neptune import init_neptune
+from utils.neptune import init_neptune
 from utils.utils import set_seed
 
 torch.backends.cudnn.benchmark = True  # speed ups
@@ -19,6 +19,8 @@ torch.backends.cudnn.benchmark = True  # speed ups
 
 base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
 base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
+base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
+
 
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - train script')
@@ -32,7 +34,7 @@ parser.add_argument('-seed', '--random_seed', type=int, metavar='', default=1000
 parser.add_argument('-dev', '--device', type=str, metavar='', default='cuda', help='device / gpu used')
 parser.add_argument('-nept', '--mode_neptune', type=str, metavar='', default='async',
                     help='Neptune run mode: async | debug')
-parser.add_argument('-run_nr', type=str, metavar='', default='1') #!added
+# parser.add_argument('-run_nr', type=str, metavar='', default='1') #!added
 
 
 # MultiStepViT architecture
@@ -50,7 +52,7 @@ parser.add_argument('-loss', '--similarity_loss', type=str, metavar='', default=
                     help='similarity loss | nmi | ncc ')
 parser.add_argument('-lr', '--learning_rate', type=float, metavar='', default=1e-4, help='learning rate')
 parser.add_argument("-rw", '--reg_weight', type=float, metavar='', default=1, help='regularization (smoothing) weight')
-parser.add_argument('-ep', '--epochs', type=int, metavar='', default=10, help='nr of epochs you want to train on')
+parser.add_argument('-ep', '--epochs', type=int, metavar='', default=50, help='nr of epochs you want to train on')
 parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
                     help='batch size you want to use during training')
 
@@ -58,6 +60,11 @@ parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
 parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', help='dataset')
 parser.add_argument('-v', '--version', type=str, metavar='', default='', help='preprocessing version')
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
+#* Data augmentation 
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
+folder_augment="artificial_N5_S10000_1000"
+
 args = parser.parse_args()
 print(vars(args))
 set_seed(args.random_seed)
@@ -67,29 +74,33 @@ if __name__ == "__main__":
     args.mode = 'train'
     # If you uncomment the code below and make an account on Neptune you can monitor the progress of your training
     # Also uncomment the lines starting with "run"  --> for example line 75 "run["dataset/size"] = len(train_dataset)" to actually log something to neptune
-    # run, args, epoch = init_neptune(args)
-    run = None # comment this line and the line below if you uncommented the lines above
-    epoch = 0
+    run, args, epoch = init_neptune(args)
+    # run = None # comment this line and the line below if you uncommented the lines above
+    # epoch = 0
 
     """ CONFIG DATASET """
     if args.dataset == 'lung':
-        train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
-        val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
-
+        if args.augmentation == 'none':
+            train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
+            val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+        elif args.augmentation == 'SMOD':
+            train_dataset = DatasetLung('train', folder_augment=folder_augment, root_data=args.root_data, version=args.version)
+            val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+    print("Training dataset size: ", len(train_dataset))
     train_dataset.adjust_shape(multiple_of=32)
     val_dataset.adjust_shape(multiple_of=32)
     if args.overfit:
         train_dataset.overfit_one(i=0)
         val_dataset = train_dataset
         val_dataset.train_val_test = 'val'
-    # run["dataset/size"] = len(train_dataset)
+    run["dataset/size"] = len(train_dataset)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
     """ INITIALIZE MODEL """
     model = init_model(args, img_size=train_dataset.inshape)
-    # run["model/trainable_params"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    # run["model/architecture"] = model
+    run["model/trainable_params"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    run["model/architecture"] = model
     model = model.to(args.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     if args.mode_neptune != 'debug':
@@ -121,9 +132,9 @@ if __name__ == "__main__":
                        similarity_loss, smooth_loss)
         print(metrics)
         # Save the model each epoch
+        epoch += 1
         if args.mode_neptune != 'debug' and epoch % 5 == 0:
             save_model(model, args, epoch, run)
-        epoch += 1
 
     df = pd.DataFrame(metrics)
     print(df)
