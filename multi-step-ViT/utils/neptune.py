@@ -4,6 +4,7 @@ Neptune functions
 from argparse import Namespace
 
 # import neptune.new as neptune
+import neptune
 import numpy as np
 
 def string_2_list(string_list):
