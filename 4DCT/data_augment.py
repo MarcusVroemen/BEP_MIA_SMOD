@@ -12,6 +12,15 @@ import datasets_utils as DU
 import elastix_functions as EF
 plt.rcParams['image.cmap'] = 'gray'
 
+root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
+# root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
+augmentation=True
+# Number of images to generate per training image
+NUM_IMAGES_TO_GENERATE = 15
+# Random component
+factor=20
+SIGMA1=1000*factor
+SIGMA2=100*factor
 
 #* functions #########################
 def prepara_traindata(root_data):
@@ -33,18 +42,14 @@ def prepara_traindata(root_data):
 
 def register_to_atlas(img_data, img_atlas, method="affine", plot=True, inverse=True):
     """Generate DVFs from set images registered on atlas image"""
-    params_path="transform_parameters/" #!
+    params_path = root_data.replace("data","transform_parameters")
     DVFs_list, DVFs_inverse_list, imgs_to_atlas = [], [], []
 
     for i in range(len(img_data)):
-        #!
-        # parameter_path_base =  "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/Elastix/Parameter files/"
-        # parameter_file = "Par0007.txt"
-    
         result_image, DVF, result_transform_parameters = EF.registration(
             fixed_image=img_atlas, moving_image=img_data[i], 
             method=method, plot=plot, 
-            output_directory=params_path) #, parameter_path=parameter_path_base+parameter_file
+            output_directory=params_path)
         DVFs_list.append(DVF)
         imgs_to_atlas.append(result_image)
         
@@ -398,37 +403,44 @@ def write_augmented_data(path, foldername, imgs_T00a, imgs_T50a):
         nib.save(img_nib, os.path.join(folder_path, 'T50.nii.gz'))
 
 if __name__ == "__main__":
-    # root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
-    root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
     
-    img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
+    if augmentation:
+        img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
 
-    # Number of images to generate per training image
-    NUM_IMAGES_TO_GENERATE = 10
-    # Random component
-    factor=20
-    SIGMA1=1000*factor
-    SIGMA2=100*factor
+        # STEP 1
+        DVFs_artificial_components_T00, imgs_to_atlas_T00, DVFs_T00 = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
+        imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
+                        img_data=img_data_T00, sigma=SIGMA1, num_images=NUM_IMAGES_TO_GENERATE, plot=False)
+        # plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA1), neg=True)
+        # plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA1), neg=False)
+        
+        # STEP 2
+        imgs_artificial_T50 = data_augm_breathing(imgs_T00=img_data_T00, imgs_T50=img_data_T50, imgs_T00a=imgs_artificial_T00, 
+                                                    sigma=SIGMA2, num_images=NUM_IMAGES_TO_GENERATE, plot=False)
+        # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=False)
+        # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=True)
+        
+        plot_data_augmpairs(imgs_artificial_T00, imgs_artificial_T50, title="T00a and T50a with same DVFa sigma={}|{}".format(SIGMA1, SIGMA2))
+        # plot_data_augmpairs(img_data_T00, img_data_T50, title="T00 and T50 original")
 
+        # Write data
+        write_augmented_data(path=root_data, foldername="artificial/artificial_N{}_S{}_{}".format(NUM_IMAGES_TO_GENERATE, SIGMA1, SIGMA2), 
+                                imgs_T00a=imgs_artificial_T00, imgs_T50a=imgs_artificial_T50)
 
-    # STEP 1
-    DVFs_artificial_components_T00, imgs_to_atlas_T00, DVFs_T00 = data_augm_preprocessing(generate=False, img_data=img_data_T00) # saved atlas is T00
-    imgs_artificial_T00 = data_augm_generation(DVFs_artificial_components=DVFs_artificial_components_T00, imgs_to_atlas=imgs_to_atlas_T00, 
-                    img_data=img_data_T00, sigma=SIGMA1, num_images=NUM_IMAGES_TO_GENERATE)
-    plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA1), neg=True)
-    plot_data_augm(imgs_artificial=imgs_artificial_T00, imgs_original=img_data_T00, num_images=NUM_IMAGES_TO_GENERATE, title="T00s (DVFaT00) sigma={}".format(SIGMA1), neg=False)
-    
-    # STEP 2
-    imgs_artificial_T50 = data_augm_breathing(imgs_T00=img_data_T00, imgs_T50=img_data_T50, imgs_T00a=imgs_artificial_T00, 
-                                                sigma=SIGMA2, num_images=NUM_IMAGES_TO_GENERATE, plot=True)
-    plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=False)
-    # plot_data_augm(imgs_artificial=imgs_artificial_T50, imgs_original=imgs_artificial_T50, num_images=NUM_IMAGES_TO_GENERATE, title="T50aEXP (DVFa-EXP with bspline on T00a) sigma={}".format(SIGMA2), neg=True)
-    
-    plot_data_augmpairs(imgs_artificial_T00, imgs_artificial_T50, title="T00a and T50a with same DVFa sigma={}|{}".format(SIGMA1, SIGMA2))
-    plot_data_augmpairs(img_data_T00, img_data_T50, title="T00 and T50 original")
+    else:
+        n=10
+        factor=20
+        s1=factor*1000
+        s2=factor*100
+        folder_augment=f"artificial_N{n}_S{s1}_{s2}"
+        
+        train_dataset = DU.DatasetLung('artificial', root_data=root_data, folder_augment=folder_augment, augment_def=False, phases="in_ex")
+        img_data_T00a, img_data_T50a = [], []
+        for i in range(len(train_dataset)):
+            img_fixed, img_moving,_,_ = train_dataset[i]
+            img_data_T00a.append(ndi.rotate(img_fixed.squeeze(0).numpy(),-90,axes=(2,0))), img_data_T50a.append(ndi.rotate(img_moving.squeeze(0).numpy(),-90,axes=(2,0)))  #fixed T50 are dubble, moving T00a and T90       
 
-    # Write data
-    write_augmented_data(path=root_data, foldername="artificial_N{}_S{}_{}".format(NUM_IMAGES_TO_GENERATE, SIGMA1, SIGMA2), 
-                            imgs_T00a=imgs_artificial_T00, imgs_T50a=imgs_artificial_T50)
+        plot_data_augmpairs(img_data_T00a, img_data_T50a, title="T00a and T50a N={} sigma={}|{}".format(n, s1, s1))
+        
 
 

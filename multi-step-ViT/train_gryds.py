@@ -11,6 +11,9 @@ from model.utils import save_model, init_model#, set_level_sequential_training_2
 from utils.neptune import init_neptune
 from utils.utils import set_seed
 
+import augmentation.grydsphysicsinformed as AGRYDS
+import augmentation.SMOD as ASMOD
+
 torch.backends.cudnn.benchmark = True  # speed ups
 
 # import os
@@ -60,8 +63,12 @@ parser.add_argument('-v', '--version', type=str, metavar='', default='', help='p
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
 #* Data augmentation 
 # parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
 folder_augment="artificial/artificial_N5_S10000_1000"
+
+parser.add_argument('--augment_type', type=str, default='GrydsPhysicsInformed',
+                    help="should be GrydsPhysicsInformed")
 
 args = parser.parse_args()
 print(vars(args))
@@ -80,11 +87,20 @@ if __name__ == "__main__":
     if args.dataset == 'lung':
         if args.augmentation == 'none':
             train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
-            val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+        
         elif args.augmentation == 'SMOD':
             train_dataset = DatasetLung('train', folder_augment=folder_augment, root_data=args.root_data, version=args.version)
-            val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
-    print("Training dataset size: ", len(train_dataset))
+        
+        elif args.augmentation == 'gryds':
+            augmenter = AGRYDS.Augmentation(args)
+            train_dataset = AGRYDS.DatasetLung(train_val_test='train', version='',
+                                   root_data=args.dataroot, augmenter=augmenter, save_augmented=True, phases='in_ex')
+
+            
+        print("Training dataset size: ", len(train_dataset))
+    
+        val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+    
     train_dataset.adjust_shape(multiple_of=32)
     val_dataset.adjust_shape(multiple_of=32)
     if args.overfit:
