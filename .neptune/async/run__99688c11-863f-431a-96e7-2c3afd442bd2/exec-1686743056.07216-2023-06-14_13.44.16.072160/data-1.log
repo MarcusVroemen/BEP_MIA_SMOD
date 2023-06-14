@@ -1,0 +1,63 @@
+{"obj": {"type": "AssignString", "path": ["sys", "name"], "value": "Untitled"}, "version": 1}
+{"obj": {"type": "AssignString", "path": ["sys", "description"], "value": ""}, "version": 2}
+{"obj": {"type": "AssignString", "path": ["monitoring", "e3ca2bc8", "hostname"], "value": "bme-gpuC001"}, "version": 3}
+{"obj": {"type": "AssignString", "path": ["sys", "hostname"], "value": "bme-gpuC001"}, "version": 4}
+{"obj": {"type": "AssignString", "path": ["monitoring", "e3ca2bc8", "pid"], "value": "1447504"}, "version": 5}
+{"obj": {"type": "AssignString", "path": ["monitoring", "e3ca2bc8", "tid"], "value": "46912496392384"}, "version": 6}
+{"obj": {"type": "AssignBool", "path": ["sys", "failed"], "value": false}, "version": 7}
+{"obj": {"type": "ClearStringLog", "path": ["monitoring", "e3ca2bc8", "stdout"]}, "version": 8}
+{"obj": {"type": "ClearStringLog", "path": ["monitoring", "e3ca2bc8", "stderr"]}, "version": 9}
+{"obj": {"type": "AssignString", "path": ["source_code", "entrypoint"], "value": "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/train_gryds.py"}, "version": 10}
+{"obj": {"type": "UploadFileSet", "path": ["source_code", "files"], "file_globs": ["/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/*.py", "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/utils/*.py", "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/model/***", "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/datasets/*.py", "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/evaluation/*.py", "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/executor/*.py", "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/train.py"], "reset": "False"}, "version": 11}
+{"obj": {"type": "ConfigFloatSeries", "path": ["monitoring", "e3ca2bc8", "cpu"], "min": 0.0, "max": 100.0, "unit": "%"}, "version": 12}
+{"obj": {"type": "ClearFloatLog", "path": ["monitoring", "e3ca2bc8", "cpu"]}, "version": 13}
+{"obj": {"type": "ConfigFloatSeries", "path": ["monitoring", "e3ca2bc8", "memory"], "min": 0.0, "max": 376.57294845581055, "unit": "GB"}, "version": 14}
+{"obj": {"type": "ClearFloatLog", "path": ["monitoring", "e3ca2bc8", "memory"]}, "version": 15}
+{"obj": {"type": "ConfigFloatSeries", "path": ["monitoring", "e3ca2bc8", "gpu"], "min": 0.0, "max": 100.0, "unit": "%"}, "version": 16}
+{"obj": {"type": "ClearFloatLog", "path": ["monitoring", "e3ca2bc8", "gpu"]}, "version": 17}
+{"obj": {"type": "ConfigFloatSeries", "path": ["monitoring", "e3ca2bc8", "gpu_memory"], "min": 0.0, "max": 11.0, "unit": "GB"}, "version": 18}
+{"obj": {"type": "ClearFloatLog", "path": ["monitoring", "e3ca2bc8", "gpu_memory"]}, "version": 19}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "cpu"], "values": [{"value": 36.0, "step": null, "ts": 1686743056.1293118}]}, "version": 20}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "memory"], "values": [{"value": 31.78671646118164, "step": null, "ts": 1686743056.1293118}]}, "version": 21}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "gpu_memory"], "values": [{"value": 0.23883056640625, "step": null, "ts": 1686743056.1293118}]}, "version": 22}
+{"obj": {"type": "AssignString", "path": ["parameters", "network"], "value": "msvit"}, "version": 23}
+{"obj": {"type": "AssignString", "path": ["parameters", "root_checkpoints"], "value": "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/checkpoints"}, "version": 24}
+{"obj": {"type": "AssignString", "path": ["parameters", "root_output"], "value": "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/output/model_val_metrics"}, "version": 25}
+{"obj": {"type": "AssignString", "path": ["parameters", "root_data"], "value": "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/4DCT/data"}, "version": 26}
+{"obj": {"type": "AssignInt", "path": ["parameters", "random_seed"], "value": 1000}, "version": 27}
+{"obj": {"type": "AssignString", "path": ["parameters", "device"], "value": "cuda"}, "version": 28}
+{"obj": {"type": "AssignString", "path": ["parameters", "mode_neptune"], "value": "async"}, "version": 29}
+{"obj": {"type": "AssignInt", "path": ["parameters", "vit_steps"], "value": 2}, "version": 30}
+{"obj": {"type": "AssignString", "path": ["parameters", "similarity_loss"], "value": "ncc"}, "version": 31}
+{"obj": {"type": "AssignFloat", "path": ["parameters", "learning_rate"], "value": 0.0001}, "version": 32}
+{"obj": {"type": "AssignInt", "path": ["parameters", "reg_weight"], "value": 1}, "version": 33}
+{"obj": {"type": "AssignInt", "path": ["parameters", "epochs"], "value": 10}, "version": 34}
+{"obj": {"type": "AssignInt", "path": ["parameters", "batch_size"], "value": 1}, "version": 35}
+{"obj": {"type": "AssignString", "path": ["parameters", "dataset"], "value": "lung"}, "version": 36}
+{"obj": {"type": "AssignString", "path": ["parameters", "version"], "value": ""}, "version": 37}
+{"obj": {"type": "AssignBool", "path": ["parameters", "overfit"], "value": false}, "version": 38}
+{"obj": {"type": "AssignString", "path": ["parameters", "augmentation"], "value": "gryds"}, "version": 39}
+{"obj": {"type": "AssignString", "path": ["parameters", "augment_type"], "value": "GrydsPhysicsInformed"}, "version": 40}
+{"obj": {"type": "AssignString", "path": ["parameters", "mode"], "value": "train"}, "version": 41}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stderr"], "values": [{"value": "You're attempting to log a type that is not directly supported by Neptune (<class 'list'>).\n        Convert the value to a supported type, such as a string or float, or use stringify_unsupported(obj)\n        for dictionaries or collections that contain unsupported values.\n        For more, see https://docs.neptune.ai/help/value_of_unsupported_type\n", "step": null, "ts": 1686743056.152662}]}, "version": 42}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stderr"], "values": [{"value": "torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /opt/conda/conda-bld/pytorch_1678402411778/work/aten/src/ATen/native/TensorShape.cpp:3483.)\n", "step": null, "ts": 1686743056.1766026}]}, "version": 43}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stdout"], "values": [{"value": "Training dataset size: ", "step": null, "ts": 1686743056.5397253}]}, "version": 44}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stdout"], "values": [{"value": " ", "step": null, "ts": 1686743056.5411274}]}, "version": 45}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stdout"], "values": [{"value": "18", "step": null, "ts": 1686743056.5416338}]}, "version": 46}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stdout"], "values": [{"value": "\n", "step": null, "ts": 1686743056.5420506}]}, "version": 47}
+{"obj": {"type": "AssignInt", "path": ["dataset", "size"], "value": 18}, "version": 48}
+{"obj": {"type": "AssignInt", "path": ["model", "trainable_params"], "value": 13875942}, "version": 49}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stderr"], "values": [{"value": "You're attempting to log a type that is not directly supported by Neptune (<class 'model.MultiStepViT.MultiStepViT.MultiStepViT'>).\n        Convert the value to a supported type, such as a string or float, or use stringify_unsupported(obj)\n        for dictionaries or collections that contain unsupported values.\n        For more, see https://docs.neptune.ai/help/value_of_unsupported_type\n", "step": null, "ts": 1686743057.3356543}]}, "version": 50}
+{"obj": {"type": "AssignString", "path": ["model", "path"], "value": "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/multi-step-ViT/checkpoints/VIT-74/VIT-74_msvit_ep-0000.pt"}, "version": 51}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stdout"], "values": [{"value": "\n----- Training -----", "step": null, "ts": 1686743059.6979802}]}, "version": 52}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stdout"], "values": [{"value": "\n", "step": null, "ts": 1686743059.699238}]}, "version": 53}
+{"obj": {"type": "LogStrings", "path": ["monitoring", "e3ca2bc8", "stdout"], "values": [{"value": "\r  0%|          | 0/18 [00:00<?, ?it/s]", "step": null, "ts": 1686743059.7013388}]}, "version": 54}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "cpu"], "values": [{"value": 36.0, "step": null, "ts": 1686743066.145654}]}, "version": 55}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "memory"], "values": [{"value": 31.996219635009766, "step": null, "ts": 1686743066.145654}]}, "version": 56}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "gpu_memory"], "values": [{"value": 0.67523193359375, "step": null, "ts": 1686743066.145654}]}, "version": 57}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "cpu"], "values": [{"value": 36.1, "step": null, "ts": 1686743076.1784022}]}, "version": 58}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "memory"], "values": [{"value": 32.05320358276367, "step": null, "ts": 1686743076.1784022}]}, "version": 59}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "gpu_memory"], "values": [{"value": 0.71234130859375, "step": null, "ts": 1686743076.1784022}]}, "version": 60}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "cpu"], "values": [{"value": 36.6, "step": null, "ts": 1686743086.1855788}]}, "version": 61}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "memory"], "values": [{"value": 32.029296875, "step": null, "ts": 1686743086.1855788}]}, "version": 62}
+{"obj": {"type": "LogFloats", "path": ["monitoring", "e3ca2bc8", "gpu_memory"], "values": [{"value": 0.92523193359375, "step": null, "ts": 1686743086.1855788}]}, "version": 63}
