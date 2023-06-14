@@ -19,7 +19,7 @@ augmentation=True
 # Number of images to generate per training image
 NUM_IMAGES_TO_GENERATE = 3
 # Random component
-factor=20
+factor=10
 SIGMA1=1000*factor
 SIGMA2=100*factor
 

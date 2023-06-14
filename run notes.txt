@@ -1,0 +1,60 @@
+--.RUN FILE TEMPLATE
+#!/bin/bash
+#SBATCH --mail-type=ALL                  		# Mail events (NONE, BEGIN, END, FAIL, ALL)
+#SBATCH --partition=tue.default.q #bme.gpuresearch.q       	# Partition name
+#SBATCH --mail-user=m.j.vroemen@stundent.tue.nl     	# Where to send mail (put your own mail)
+#SBATCH --nodes=1                        		# Use one node
+#SBATCH --ntasks=1                     			# Run a single task
+#SBATCH --time=00:30:00                  		# Time limit hrs:min:sec
+#SBATCH --output=/Slurm_output/adhoc_%A.out         	# Standard output and error log
+#SBATCH --gres=gpu:1 	# YOU NEED THIS SO THAT SLURM KNOWS YOU ARE USING A GPU
+
+module load cuda11.5/toolkit/11.5.1
+module load cuda11.8/toolkit/11.8.0
+
+python /home/bme001/20203531/BEP_MIA/BEP_MIA_DIR/TransMorph_Transformer_for_Medical_Image_Registration-main/TransMorph/train_TransMorph.py
+
+
+--BASH COMMANDS
+$ sbatch myfirstjob.run
+$ squeue -u $(whoami)
+$ less openme.out
+
+
+--PYTHON
+python3 to open interactive python session
+
+
+--CONDA
+module load anaconda
+conda activate BEPpytorch
+sbatch BEP/python.run
+
+
+
+scancel <jobid>
+
+
+CUDA ERROR
+/home/bme001/20203531/.conda/envs/BEPpytorch/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /opt/conda/conda-bld/pytorch_1678402411778/work/aten/src/ATen/native/TensorShape.cpp:3483.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+Traceback (most recent call last):
+  File "/home/bme001/20203531/BEP_MIA/BEP_MIA_git/TransMorph_Transformer_for_Medical_Image_Registration-main/TransMorph/train_TransMorph.py", line 241, in <module>
+    main()
+  File "/home/bme001/20203531/BEP_MIA/BEP_MIA_git/TransMorph_Transformer_for_Medical_Image_Registration-main/TransMorph/train_TransMorph.py", line 55, in main
+    model.cuda()
+  File "/home/bme001/20203531/.conda/envs/BEPpytorch/lib/python3.10/site-packages/torch/nn/modules/module.py", line 905, in cuda
+    return self._apply(lambda t: t.cuda(device))
+  File "/home/bme001/20203531/.conda/envs/BEPpytorch/lib/python3.10/site-packages/torch/nn/modules/module.py", line 797, in _apply
+    module._apply(fn)
+  File "/home/bme001/20203531/.conda/envs/BEPpytorch/lib/python3.10/site-packages/torch/nn/modules/module.py", line 797, in _apply
+    module._apply(fn)
+  File "/home/bme001/20203531/.conda/envs/BEPpytorch/lib/python3.10/site-packages/torch/nn/modules/module.py", line 797, in _apply
+    module._apply(fn)
+  File "/home/bme001/20203531/.conda/envs/BEPpytorch/lib/python3.10/site-packages/torch/nn/modules/module.py", line 820, in _apply
+    param_applied = fn(param)
+  File "/home/bme001/20203531/.conda/envs/BEPpytorch/lib/python3.10/site-packages/torch/nn/modules/module.py", line 905, in <lambda>
+    return self._apply(lambda t: t.cuda(device))
+  File "/home/bme001/20203531/.conda/envs/BEPpytorch/lib/python3.10/site-packages/torch/cuda/__init__.py", line 247, in _lazy_init
+    torch._C._cuda_init()
+RuntimeError: Found no NVIDIA driver on your system. Please check that you have an NVIDIA GPU and installed a driver from http://www.nvidia.com/Download/index.aspx

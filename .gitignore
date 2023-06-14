@@ -10,3 +10,4 @@ multi-step-ViT/checkpoints/
 *.raw
 logs/
 4DCT/data/artificial/*
+logs_runs_hpc/*

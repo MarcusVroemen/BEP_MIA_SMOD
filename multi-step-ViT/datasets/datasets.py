@@ -101,6 +101,7 @@ class DatasetLung(Dataset):
         self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
         if folder_augment!=None:
             self.img_folder_augment = f'{root_data}/{folder_augment}/image/***'
+            print(self.img_folder_augment)
         else:
             self.img_folder_augment = None
         self.init_paths()
@@ -128,10 +129,12 @@ class DatasetLung(Dataset):
             self.phases_moving = [50]
 
         # Get all file names inside the data folder
+
         if self.img_folder_augment!=None:
             self.img_paths, self.landmarks_paths = glob(self.img_folder)+glob(self.img_folder_augment), glob(self.landmarks_folder)
         else:
             self.img_paths, self.landmarks_paths = glob(self.img_folder), glob(self.landmarks_folder)
+        # print(self.img_paths)
         self.img_paths.sort()
         self.landmarks_paths.sort()
         self.fixed_img, self.moving_img = [], []

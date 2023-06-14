@@ -4,7 +4,7 @@ Neptune functions
 from argparse import Namespace
 
 
-import neptune.new as neptune
+import neptune
 
 import numpy as np
 

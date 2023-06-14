@@ -132,10 +132,6 @@ def get_metrics_dict(dict, image_1, image_2, label_1, label_2, points_1, points_
         append_value(dict, key, value)
 
     # Dices and HD
-<<<<<<< HEAD
-=======
-
->>>>>>> 257bd2a54dbfb36de560db66ca259015f51f2905
     if label_1!=None:
         if label_1.sum().item() > 0 and label_2.sum().item() > 0:
             dices = multiclass_dsc(label_1, label_2)
