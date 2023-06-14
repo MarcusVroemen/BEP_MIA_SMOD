@@ -18,7 +18,9 @@ torch.backends.cudnn.benchmark = True  # speed ups
 # print(os.environ.get("PYDEVD_WARN_EVALUATION_TIMEOUT"))
 
 base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
+base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
 base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
+
 
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - train script')
@@ -128,13 +130,14 @@ if __name__ == "__main__":
                     similarity_loss, smooth_loss)
         metrics = validate_epoch(model, val_loader, run, args,
                        similarity_loss, smooth_loss)
-
+        print(metrics)
         # Save the model each epoch
         epoch += 1
         if args.mode_neptune != 'debug' and epoch % 5 == 0:
             save_model(model, args, epoch, run)
 
     df = pd.DataFrame(metrics)
+    print(df)
     csv_path = '{}/csv/{}_{}_ep-{:04d}.csv'.format(args.root_output, args.run_nr, args.network, epoch - 1)
     df.to_csv(csv_path)
     df.to_pickle(csv_path.replace('csv', 'pkl'))

@@ -13,6 +13,8 @@ from utils.neptune import re_init_neptune
 # TODO:
 
 torch.backends.cudnn.benchmark = True  # speed ups
+base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
+
 
 base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
 
