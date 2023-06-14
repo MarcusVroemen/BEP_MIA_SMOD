@@ -11,16 +11,17 @@ from model.utils import save_model, init_model#, set_level_sequential_training_2
 from utils.neptune import init_neptune
 from utils.utils import set_seed
 
+import augmentation.grydsphysicsinformed as AGRYDS
+import augmentation.SMOD as ASMOD
+
 torch.backends.cudnn.benchmark = True  # speed ups
 
 # import os
 # os.environ["PYDEVD_WARN_EVALUATION_TIMEOUT"] = "100"
 # print(os.environ.get("PYDEVD_WARN_EVALUATION_TIMEOUT"))
 
-base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
-# base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
-# base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
-
+base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
+base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
 
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - train script')
@@ -34,22 +35,24 @@ parser.add_argument('-seed', '--random_seed', type=int, metavar='', default=1000
 parser.add_argument('-dev', '--device', type=str, metavar='', default='cuda', help='device / gpu used')
 parser.add_argument('-nept', '--mode_neptune', type=str, metavar='', default='async',
                     help='Neptune run mode: async | debug')
+# parser.add_argument('-run_nr', type=str, metavar='', default='1') #!added
+
 
 # MultiStepViT architecture
 parser.add_argument('--vit_steps', type=int, metavar='', default=2, help='the number of steps of the MultiStepViT')
 parser.add_argument('--patch_size', type=int, metavar='', default=[8, 4], nargs='+', help='patch size')
 parser.add_argument('--stages', type=int, metavar='', default=[3, 4], nargs='+', help='nr. of stages')
-parser.add_argument('--embed_dim', type=int, metavar='', default=[48, 96], nargs='+', help='embedded dimensions') 
-parser.add_argument('--depths', type=int, metavar='', default=[2,2], nargs='+', help='nr. of MSA blocks')   
-parser.add_argument('--num_heads', type=int, metavar='', default=[4,4], nargs='+',                          
+parser.add_argument('--embed_dim', type=int, metavar='', default=[48, 48], nargs='+', help='embedded dimensions') #! [48]
+parser.add_argument('--depths', type=int, metavar='', default=[2,2], nargs='+', help='nr. of MSA blocks')   #! [2]
+parser.add_argument('--num_heads', type=int, metavar='', default=[4,4], nargs='+',                          #! [4]
                     help='nr. of attention heads in the MSA block')
-parser.add_argument('--window_size', type=int, metavar='', default=[2,2], nargs='+', help='window size')    
+parser.add_argument('--window_size', type=int, metavar='', default=[2,2], nargs='+', help='window size')    #! [2]
 
 # Hyper-parameters for training
 parser.add_argument('-loss', '--similarity_loss', type=str, metavar='', default='ncc',
                     help='similarity loss | nmi | ncc ')
 parser.add_argument('-lr', '--learning_rate', type=float, metavar='', default=1e-4, help='learning rate')
-parser.add_argument("-rw", '--reg_weight', type=float, metavar='', default=0.5, help='regularization (smoothing) weight')
+parser.add_argument("-rw", '--reg_weight', type=float, metavar='', default=1, help='regularization (smoothing) weight')
 parser.add_argument('-ep', '--epochs', type=int, metavar='', default=50, help='nr of epochs you want to train on')
 parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
                     help='batch size you want to use during training')
@@ -60,16 +63,12 @@ parser.add_argument('-v', '--version', type=str, metavar='', default='', help='p
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
 #* Data augmentation 
 # parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
-<<<<<<< HEAD
-# folder_augment="artificial/artificial_N5_S10000_1000"
-folder_augment="artificial/artificial_N10_S10000_1000"
-# folder_augment="artificial/artificial_N10_S15000_1500"
-# folder_augment="artificial/artificial_N10_S20000_2000"
-print(folder_augment)
-=======
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
 folder_augment="artificial/artificial_N5_S10000_1000"
->>>>>>> 6a44420af5e6324f4c41c583d6683c86e0fb6f83
+
+parser.add_argument('--augment_type', type=str, default='GrydsPhysicsInformed',
+                    help="should be GrydsPhysicsInformed")
 
 args = parser.parse_args()
 print(vars(args))
@@ -88,11 +87,20 @@ if __name__ == "__main__":
     if args.dataset == 'lung':
         if args.augmentation == 'none':
             train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
-            val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+        
         elif args.augmentation == 'SMOD':
             train_dataset = DatasetLung('train', folder_augment=folder_augment, root_data=args.root_data, version=args.version)
-            val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
-    print("Training dataset size: ", len(train_dataset))
+        
+        elif args.augmentation == 'gryds':
+            augmenter = AGRYDS.Augmentation(args)
+            train_dataset = AGRYDS.DatasetLung(train_val_test='train', version='',
+                                   root_data=args.dataroot, augmenter=augmenter, save_augmented=True, phases='in_ex')
+
+            
+        print("Training dataset size: ", len(train_dataset))
+    
+        val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+    
     train_dataset.adjust_shape(multiple_of=32)
     val_dataset.adjust_shape(multiple_of=32)
     if args.overfit:
@@ -119,32 +127,31 @@ if __name__ == "__main__":
         similarity_loss = GlobalMutualInformationLoss()
     smooth_loss = Grad(penalty='l2', loss_mult=args.reg_weight)
 
-    # """ TRAINING """
-    # print('\n----- Training -----')
-    # # Baseline losses and metrics before training
-    # validate_epoch(model, train_loader, run, args,
-    #                similarity_loss, smooth_loss)
-    # validate_epoch(model, val_loader, run, args,
-    #                similarity_loss, smooth_loss)
+    """ TRAINING """
+    print('\n----- Training -----')
+    # Baseline losses and metrics before training
+    validate_epoch(model, train_loader, run, args,
+                   similarity_loss, smooth_loss)
+    validate_epoch(model, val_loader, run, args,
+                   similarity_loss, smooth_loss)
 
-    # # Train the model for the specified amount of epochs
-    # epoch += 1
-    # while epoch < args.epochs + 1:
-    #     print(f'\n[epoch {epoch} / {args.epochs}]')
-    #     # Train and validate for one epoch
-    #     train_epoch(model, train_loader, optimizer, run, args,
-    #                 similarity_loss, smooth_loss)
-    #     metrics = validate_epoch(model, val_loader, run, args,
-    #                    similarity_loss, smooth_loss)
-    #     print(metrics)
-    #     # Save the model each epoch
-    #     epoch += 1
-    #     if args.mode_neptune != 'debug' and epoch % 5 == 0:
-    #         save_model(model, args, epoch, run)
+    # Train the model for the specified amount of epochs
+    epoch += 1
+    while epoch < args.epochs + 1:
+        print(f'\n[epoch {epoch} / {args.epochs}]')
+        # Train and validate for one epoch
+        train_epoch(model, train_loader, optimizer, run, args,
+                    similarity_loss, smooth_loss)
+        metrics = validate_epoch(model, val_loader, run, args,
+                       similarity_loss, smooth_loss)
 
-    # df = pd.DataFrame(metrics)
-    # print(df)
-    # csv_path = '{}/csv/{}_{}_ep-{:04d}.csv'.format(args.root_output, args.run_nr, args.network, epoch - 1)
-    # df.to_csv(csv_path)
-    # df.to_pickle(csv_path.replace('csv', 'pkl'))
-    # run.stop()
+        # Save the model each epoch
+        epoch += 1
+        if args.mode_neptune != 'debug' and epoch % 5 == 0:
+            save_model(model, args, epoch, run)
+
+    df = pd.DataFrame(metrics)
+    csv_path = '{}/csv/{}_{}_ep-{:04d}.csv'.format(args.root_output, args.run_nr, args.network, epoch - 1)
+    df.to_csv(csv_path)
+    df.to_pickle(csv_path.replace('csv', 'pkl'))
+    run.stop()

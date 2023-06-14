@@ -10,4 +10,7 @@ multi-step-ViT/checkpoints/
 *.raw
 logs/
 4DCT/data/artificial/*
-logs_runs_hpc/*
+
+4DCT/data/train/synthetic_image/*
+4DCT/data/train/synthetic_dvf_resp/*
+4DCT/data/train/synthetic_dvf_aug/*

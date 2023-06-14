@@ -304,92 +304,96 @@ class Dataset(torch.utils.data.Dataset):
 
 
 class DatasetLung(Dataset):
-   def __init__(self, train_val_test, root_data,
-                augment_def=False, max_deform_base=20, sig_noise=0.005,
-                 phases='in_ex', device='cpu'):
-       super().__init__(train_val_test, augment_def, max_deform_base, sig_noise, device)
-       self.set = 'lung'
-       self.extension = '.nii.gz'
-       self.phases = phases
-       self.img_folder = f'{root_data}/{train_val_test}/image/***'
-       self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
-       self.init_paths()
-       self.init_resamplers()
-       self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
-       self.transformer = SpatialTransformer(self.inshape).to(self.device)
-       self.transformer_binary = SpatialTransformer(shape=self.inshape, mode='nearest').to(self.device)
-       self.offsets = [0, 0, 0]
+    def __init__(self, train_val_test, root_data, folder_augment=None,
+                    augment_def=False, max_deform_base=20, sig_noise=0.005,
+                    phases='in_ex', device='cpu'):
+        super().__init__(train_val_test, augment_def, max_deform_base, sig_noise, device)
+        self.set = 'lung'
+        self.extension = '.nii.gz'
+        self.phases = phases
+        if train_val_test=="artificial":
+            self.img_folder = f'{root_data}/{train_val_test}/{folder_augment}/image/***'
+            self.landmarks_folder = ""
+        else:
+            self.img_folder = f'{root_data}/{train_val_test}/image/***'
+            self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
+        self.init_paths()
+        self.init_resamplers()
+        self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
+        self.transformer = SpatialTransformer(self.inshape).to(self.device)
+        self.transformer_binary = SpatialTransformer(shape=self.inshape, mode='nearest').to(self.device)
+        self.offsets = [0, 0, 0]
 
-   def init_paths(self):
-       if self.phases == 'in_ex':
-           self.phases_fixed = [0, 90]
-           self.phases_moving = [50, 50]
+    def init_paths(self):
+        if self.phases == 'in_ex':
+            self.phases_fixed = [0, 90]
+            self.phases_moving = [50, 50]
 
-       if self.train_val_test != 'train':
-           self.phases_fixed = [0]
-           self.phases_moving = [50]
+        if self.train_val_test != 'train':
+            self.phases_fixed = [0]
+            self.phases_moving = [50]
 
-       # Get all file names inside the data folder
-       self.img_paths, self.landmarks_paths = glob(self.img_folder), glob(self.landmarks_folder)
-       self.img_paths.sort(), self.landmarks_paths.sort()
-       self.fixed_img, self.moving_img = [], []
-       self.fixed_lbl, self.moving_lbl = [], []
-       self.fixed_pts, self.moving_pts = [], []
+        # Get all file names inside the data folder
+        self.img_paths, self.landmarks_paths = glob(self.img_folder), glob(self.landmarks_folder)
+        self.img_paths.sort(), self.landmarks_paths.sort()
+        self.fixed_img, self.moving_img = [], []
+        self.fixed_lbl, self.moving_lbl = [], []
+        self.fixed_pts, self.moving_pts = [], []
 
-       for img_folder in self.img_paths:
-           landmark_folder = img_folder.replace('image', 'landmarks')
-           for phase_fixed, phase_moving in zip(self.phases_fixed, self.phases_moving):
-               f = os.path.join(img_folder, 'T{:02d}{}'.format(phase_fixed, self.extension))
-               m = os.path.join(img_folder, 'T{:02d}{}'.format(phase_moving, self.extension))
-               fl = os.path.join(landmark_folder, 'T{:02d}.txt'.format(phase_fixed))
-               ml= os.path.join(landmark_folder, 'T{:02d}.txt'.format(phase_moving))
+        for img_folder in self.img_paths:
+            landmark_folder = img_folder.replace('image', 'landmarks')
+            for phase_fixed, phase_moving in zip(self.phases_fixed, self.phases_moving):
+                f = os.path.join(img_folder, 'T{:02d}{}'.format(phase_fixed, self.extension))
+                m = os.path.join(img_folder, 'T{:02d}{}'.format(phase_moving, self.extension))
+                fl = os.path.join(landmark_folder, 'T{:02d}.txt'.format(phase_fixed))
+                ml= os.path.join(landmark_folder, 'T{:02d}.txt'.format(phase_moving))
 
-               if os.path.exists(f) and os.path.exists(m):
-                   self.fixed_img.append(f)
-                   self.moving_img.append(m)
-                   self.fixed_lbl.append('')
-                   self.moving_lbl.append('')
-                   if os.path.exists(fl) and os.path.exists(ml):
-                       self.fixed_pts.append(fl)
-                       self.moving_pts.append(ml)
-                   else:
-                       self.fixed_pts.append('')
-                       self.moving_pts.append('')
-
-
-   def get_case_sessions(self, i):
-       moving_path, fixed_path, _, _ = self.get_paths(i)
-       case = int(fixed_path[-13:-11])
-       ses_m = int(moving_path[-9:-7])
-       ses_f = int(fixed_path[-9:-7])
-       return case, case, ses_m, ses_f
-
-   def get_landmarks(self, i):
-       fixed_landmarks = read_pts(self.fixed_pts[i]) + torch.tensor(self.offsets)
-       moving_landmarks = read_pts(self.moving_pts[i]) + torch.tensor(self.offsets)
-
-       indices_all = []
-       for pts in [fixed_landmarks, moving_landmarks]:
-           indices_all = indices_all + np.argwhere(pts[:, 0] >= self.inshape[0]).tolist()[0]
-           indices_all = indices_all + np.argwhere(pts[:, 1] >= self.inshape[1]).tolist()[0]
-           indices_all = indices_all + np.argwhere(pts[:, 2] >= self.inshape[2]).tolist()[0]
-           indices_all = indices_all + np.argwhere(pts[:, 0] < 0).tolist()[0]
-           indices_all = indices_all + np.argwhere(pts[:, 1] < 0).tolist()[0]
-           indices_all = indices_all + np.argwhere(pts[:, 2] < 0).tolist()[0]
-
-       indices_all = np.unique(indices_all)
-
-       if len(indices_all) > 0:
-           fixed_landmarks = np.delete(fixed_landmarks, indices_all, axis=0)
-           moving_landmarks = np.delete(moving_landmarks, indices_all, axis=0)
-       return moving_landmarks, fixed_landmarks
+                if os.path.exists(f) and os.path.exists(m):
+                    self.fixed_img.append(f)
+                    self.moving_img.append(m)
+                    self.fixed_lbl.append('')
+                    self.moving_lbl.append('')
+                    if os.path.exists(fl) and os.path.exists(ml):
+                        self.fixed_pts.append(fl)
+                        self.moving_pts.append(ml)
+                    else:
+                        self.fixed_pts.append('')
+                        self.moving_pts.append('')
 
 
-   def overfit_one(self, i):
-       self.overfit = True
-       self.moving_img, self.fixed_img = [self.moving_img[i]], [self.fixed_img[i]]
-       self.moving_lbl, self.fixed_lbl = [self.moving_lbl[i]], [self.fixed_lbl[i]]
-       self.moving_pts, self.fixed_pts = [self.moving_pts[i]], [self.fixed_pts[i]]
+    def get_case_sessions(self, i):
+        moving_path, fixed_path, _, _ = self.get_paths(i)
+        case = int(fixed_path[-13:-11])
+        ses_m = int(moving_path[-9:-7])
+        ses_f = int(fixed_path[-9:-7])
+        return case, case, ses_m, ses_f
+
+    def get_landmarks(self, i):
+        fixed_landmarks = read_pts(self.fixed_pts[i]) + torch.tensor(self.offsets)
+        moving_landmarks = read_pts(self.moving_pts[i]) + torch.tensor(self.offsets)
+
+        indices_all = []
+        for pts in [fixed_landmarks, moving_landmarks]:
+            indices_all = indices_all + np.argwhere(pts[:, 0] >= self.inshape[0]).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 1] >= self.inshape[1]).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 2] >= self.inshape[2]).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 0] < 0).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 1] < 0).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 2] < 0).tolist()[0]
+
+        indices_all = np.unique(indices_all)
+
+        if len(indices_all) > 0:
+            fixed_landmarks = np.delete(fixed_landmarks, indices_all, axis=0)
+            moving_landmarks = np.delete(moving_landmarks, indices_all, axis=0)
+        return moving_landmarks, fixed_landmarks
+
+
+    def overfit_one(self, i):
+        self.overfit = True
+        self.moving_img, self.fixed_img = [self.moving_img[i]], [self.fixed_img[i]]
+        self.moving_lbl, self.fixed_lbl = [self.moving_lbl[i]], [self.fixed_lbl[i]]
+        self.moving_pts, self.fixed_pts = [self.moving_pts[i]], [self.fixed_pts[i]]
 
 
 if __name__ == '__main__':

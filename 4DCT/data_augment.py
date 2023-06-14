@@ -12,12 +12,14 @@ import datasets_utils as DU
 import elastix_functions as EF
 plt.rcParams['image.cmap'] = 'gray'
 
+
 # root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
 # root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
 root_data = '/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/4DCT/data/'
 augmentation=True
 # Number of images to generate per training image
 NUM_IMAGES_TO_GENERATE = 3
+
 # Random component
 factor=20
 SIGMA1=1000*factor
@@ -44,7 +46,6 @@ def prepara_traindata(root_data):
 def register_to_atlas(img_data, img_atlas, method="affine", plot=True, inverse=True):
     """Generate DVFs from set images registered on atlas image"""
     params_path = root_data.replace("data","transform_parameters")
-
     DVFs_list, DVFs_inverse_list, imgs_to_atlas = [], [], []
 
     for i in range(len(img_data)):
