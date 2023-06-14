@@ -61,15 +61,13 @@ parser.add_argument('--overfit', action='store_true', help='overfit on 1 image d
 #* Data augmentation 
 # parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
 parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
-<<<<<<< HEAD
+
 # folder_augment="artificial/artificial_N5_S10000_1000"
 folder_augment="artificial/artificial_N10_S10000_1000"
 # folder_augment="artificial/artificial_N10_S15000_1500"
 # folder_augment="artificial/artificial_N10_S20000_2000"
 print(folder_augment)
-=======
-folder_augment="artificial/artificial_N5_S10000_1000"
->>>>>>> 6a44420af5e6324f4c41c583d6683c86e0fb6f83
+
 
 args = parser.parse_args()
 print(vars(args))

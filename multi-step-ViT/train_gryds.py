@@ -16,12 +16,10 @@ import augmentation.SMOD as ASMOD
 
 torch.backends.cudnn.benchmark = True  # speed ups
 
-# import os
-# os.environ["PYDEVD_WARN_EVALUATION_TIMEOUT"] = "100"
-# print(os.environ.get("PYDEVD_WARN_EVALUATION_TIMEOUT"))
+# base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
+# base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
+base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
 
-base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
-base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
 
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - train script')
@@ -53,7 +51,7 @@ parser.add_argument('-loss', '--similarity_loss', type=str, metavar='', default=
                     help='similarity loss | nmi | ncc ')
 parser.add_argument('-lr', '--learning_rate', type=float, metavar='', default=1e-4, help='learning rate')
 parser.add_argument("-rw", '--reg_weight', type=float, metavar='', default=1, help='regularization (smoothing) weight')
-parser.add_argument('-ep', '--epochs', type=int, metavar='', default=50, help='nr of epochs you want to train on')
+parser.add_argument('-ep', '--epochs', type=int, metavar='', default=10, help='nr of epochs you want to train on')
 parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
                     help='batch size you want to use during training')
 
@@ -94,7 +92,7 @@ if __name__ == "__main__":
         elif args.augmentation == 'gryds':
             augmenter = AGRYDS.Augmentation(args)
             train_dataset = AGRYDS.DatasetLung(train_val_test='train', version='',
-                                   root_data=args.dataroot, augmenter=augmenter, save_augmented=True, phases='in_ex')
+                                   root_data=args.root_data, augmenter=augmenter, save_augmented=True, phases='in_ex')
 
             
         print("Training dataset size: ", len(train_dataset))
