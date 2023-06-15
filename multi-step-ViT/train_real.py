@@ -54,7 +54,7 @@ parser.add_argument('-loss', '--similarity_loss', type=str, metavar='', default=
                     help='similarity loss | nmi | ncc ')
 parser.add_argument('-lr', '--learning_rate', type=float, metavar='', default=1e-4, help='learning rate')
 parser.add_argument("-rw", '--reg_weight', type=float, metavar='', default=0.5, help='regularization (smoothing) weight')
-parser.add_argument('-ep', '--epochs', type=int, metavar='', default=50, help='nr of epochs you want to train on')
+parser.add_argument('-ep', '--epochs', type=int, metavar='', default=5, help='nr of epochs you want to train on')
 parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
                     help='batch size you want to use during training')
 
@@ -63,10 +63,10 @@ parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', h
 parser.add_argument('-v', '--version', type=str, metavar='', default='', help='preprocessing version')
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
 #* Data augmentation 
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
 # parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
-
+augmentation_mode="none"
 
 args = parser.parse_args()
 print(vars(args))
@@ -90,14 +90,14 @@ if __name__ == "__main__":
             dataset_original = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, augmenter=None, phases='in_ex')
             augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
                                         sigma1=15000, sigma2=1500, num_images=1, 
-                                        plot=True, load_atlas=False)
+                                        plot=False, load_atlas=True)
             train_dataset = DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
                                         augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
             
             
         elif args.augmentation == 'gryds':
             augmenter_gryds = AUG.Augmentation_gryds(args)
-            dataset_synthetic = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
+            train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
                                         augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
             
     val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
@@ -130,32 +130,32 @@ if __name__ == "__main__":
         similarity_loss = GlobalMutualInformationLoss()
     smooth_loss = Grad(penalty='l2', loss_mult=args.reg_weight)
 
-    # """ TRAINING """
-    # print('\n----- Training -----')
-    # # Baseline losses and metrics before training
-    # validate_epoch(model, train_loader, run, args,
-    #                similarity_loss, smooth_loss)
-    # validate_epoch(model, val_loader, run, args,
-    #                similarity_loss, smooth_loss)
+    """ TRAINING """
+    print('\n----- Training -----')
+    # Baseline losses and metrics before training
+    validate_epoch(model, train_loader, run, args,
+                   similarity_loss, smooth_loss)
+    validate_epoch(model, val_loader, run, args,
+                   similarity_loss, smooth_loss)
 
-    # # Train the model for the specified amount of epochs
-    # epoch += 1
-    # while epoch < args.epochs + 1:
-    #     print(f'\n[epoch {epoch} / {args.epochs}]')
-    #     # Train and validate for one epoch
-    #     train_epoch(model, train_loader, optimizer, run, args,
-    #                 similarity_loss, smooth_loss)
-    #     metrics = validate_epoch(model, val_loader, run, args,
-    #                    similarity_loss, smooth_loss)
-    #     print(metrics)
-    #     # Save the model each epoch
-    #     epoch += 1
-    #     if args.mode_neptune != 'debug' and epoch % 5 == 0:
-    #         save_model(model, args, epoch, run)
+    # Train the model for the specified amount of epochs
+    epoch += 1
+    while epoch < args.epochs + 1:
+        print(f'\n[epoch {epoch} / {args.epochs}]')
+        # Train and validate for one epoch
+        train_epoch(model, train_loader, optimizer, run, args,
+                    similarity_loss, smooth_loss)
+        metrics = validate_epoch(model, val_loader, run, args,
+                       similarity_loss, smooth_loss)
+        print(metrics)
+        # Save the model each epoch
+        epoch += 1
+        if args.mode_neptune != 'debug' and epoch % 5 == 0:
+            save_model(model, args, epoch, run)
 
-    # df = pd.DataFrame(metrics)
-    # print(df)
-    # csv_path = '{}/csv/{}_{}_ep-{:04d}.csv'.format(args.root_output, args.run_nr, args.network, epoch - 1)
-    # df.to_csv(csv_path)
-    # df.to_pickle(csv_path.replace('csv', 'pkl'))
-    # run.stop()
+    df = pd.DataFrame(metrics)
+    print(df)
+    csv_path = '{}/csv/{}_{}_ep-{:04d}.csv'.format(args.root_output, args.run_nr, args.network, epoch - 1)
+    df.to_csv(csv_path)
+    df.to_pickle(csv_path.replace('csv', 'pkl'))
+    run.stop()
