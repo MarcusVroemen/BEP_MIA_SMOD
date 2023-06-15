@@ -695,7 +695,7 @@ class Augmentation_SMOD():
             
             result_image, deformation_field, _ = self.registration(
                 fixed_image=A0, moving_image=moving_image, 
-                method="rigid", plot=False)
+                method="rigid")
             registered_set.append(result_image)
 
         # Obtain A1 by averaging registerd set IT0
@@ -719,7 +719,7 @@ class Augmentation_SMOD():
                 
                 result_image, deformation_field, _ = self.registration(
                     fixed_image=An, moving_image=registered_set[i], 
-                    method="affine", plot=False)  # ?Affine
+                    method="affine")  # ?Affine
                 re_registered_set.append(result_image)
 
             A_new_array = sum(np.asarray(re_registered_set)) / len(np.asarray(re_registered_set)) 
@@ -965,54 +965,54 @@ if __name__ == '__main__':
     fig.show()
 
 
-    augmentation="gryds" # or "gryds"
-    if augmentation=="SMOD":
+    # augmentation="gryds" # or "gryds"
+    # if augmentation=="SMOD":
         # example of synthetic data with SMOD
         #TODO: add non varying data 
-        augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
-                                        sigma1=15000, sigma2=1500, num_images=1, 
-                                        plot=True, load_atlas=False)
-        dataset_synthetic = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-                                        augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
+    augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
+                                    sigma1=15000, sigma2=1500, num_images=1, 
+                                    plot=True, load_atlas=False)
+    dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
+                                    augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
     
-    elif augmentation == "gryds":
-        # parser = argparse.ArgumentParser()
-        # parser.add_argument('--seed_value', type=int, default=1000)
-        # parser.add_argument('--dataroot', type=str, default=root_data)
-        # parser.add_argument('--augment_type', type=str, default='GrydsPhysicsInformed',
-        #                     help="should be GrydsPhysicsInformed")
-        # parser.add_argument('--phase', type=str, default='train', help='train, val, test')
-        # parser.add_argument('-dev', '--device', type=str, metavar='', default='cuda:0', help='device / gpu used')
-        # args = parser.parse_args()
-        # set_seed(args.seed_value)
-        
-        augmenter_gryds = Augmentation_gryds()
-        dataset_synthetic = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-                                        augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
+    # elif augmentation == "gryds":
+    augmenter_gryds = Augmentation_gryds()
+    dataset_synthetic_gryds = DatasetLung(train_val_test='train', version='', root_data=root_data, 
+                                    augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
  
     
     inhaled, exhaled = zip(*[(img_inhaled[0], img_exhaled[0]) for img_inhaled, img_exhaled in dataset_original])
-    for i in range(len(dataset_synthetic)):
-        if augmentation=="SMOD":
-            inhaled_synth, exhaled_synth = dataset_synthetic[i]
-        elif augmentation=="gryds":
-            inhaled_synth, exhaled_synth = dataset_synthetic[i]
-            inhaled_synth = np.asarray(inhaled_synth.to("cpu"))[0]
-            exhaled_synth = np.asarray(exhaled_synth.to("cpu"))[0]
+    # for i in range(len(dataset_synthetic_SMOD)):
+    for i in range(2):
+        # if augmentation=="SMOD":
+        inhaled_synth_SMOD, exhaled_synth_SMOD = dataset_synthetic_SMOD[i]
+        # elif augmentation=="gryds":
+        inhaled_synth_gryds, exhaled_synth_gryds = dataset_synthetic_gryds[i]
+        inhaled_synth_gryds = np.asarray(inhaled_synth_gryds.to("cpu"))[0]
+        exhaled_synth_gryds = np.asarray(exhaled_synth_gryds.to("cpu"))[0]
 
-        fig, axs = plt.subplots(2, 3)
+        fig, axs = plt.subplots(3, 3, figsize=(17,17))
         axs[0,0].imshow(np.asarray(inhaled[i])[:,64,:], cmap='gray')
         axs[0,0].set_title('inhaled')
         axs[0, 1].imshow(np.asarray(exhaled[i])[:,64,:], cmap='gray')
         axs[0, 1].set_title('exhaled')
         axs[0, 2].imshow((np.asarray(inhaled[i])-np.asarray(exhaled[i]))[:,64,:], cmap='gray')
-        axs[0, 2].set_title('inhaled-exhaled')
-        axs[1, 0].imshow(inhaled_synth[:,64,:], cmap='gray')
-        axs[1, 0].set_title('inhaled_synth')
-        axs[1, 1].imshow(exhaled_synth[:,64,:], cmap='gray')
-        axs[1, 1].set_title('exhaled_synth')
-        axs[1, 2].imshow((inhaled_synth-exhaled_synth)[:,64,:], cmap='gray')
-        axs[1, 2].set_title('inhaled_synth - exhaled_synth')
+        axs[0, 2].set_title('in - ex')
+        axs[1, 0].imshow(inhaled_synth_gryds[:,64,:], cmap='gray')
+        axs[1, 0].set_title('inhaled_synth_gryds')
+        axs[1, 1].imshow(exhaled_synth_gryds[:,64,:], cmap='gray')
+        axs[1, 1].set_title('exhaled_synth_gryds')
+        axs[1, 2].imshow((inhaled_synth_gryds-exhaled_synth_gryds)[:,64,:], cmap='gray')
+        axs[1, 2].set_title('in - ex gryds')
+        axs[2, 0].imshow(inhaled_synth_SMOD[:,64,:], cmap='gray')
+        axs[2, 0].set_title('inhaled_synth_SMOD')
+        axs[2, 1].imshow(exhaled_synth_SMOD[:,64,:], cmap='gray')
+        axs[2, 1].set_title('exhaled_synth_SMOD')
+        axs[2, 2].imshow((inhaled_synth_SMOD-exhaled_synth_SMOD)[:,64,:], cmap='gray')
+        axs[2, 2].set_title('in - ex SMOD')
+        for ax in axs.flatten():
+            ax.set_axis_off()
+        plt.tight_layout()
         fig.show()
 
 
