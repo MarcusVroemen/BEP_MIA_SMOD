@@ -64,8 +64,8 @@ parser.add_argument('-v', '--version', type=str, metavar='', default='', help='p
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
 #* Data augmentation 
 # parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
-parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
 
 
 args = parser.parse_args()

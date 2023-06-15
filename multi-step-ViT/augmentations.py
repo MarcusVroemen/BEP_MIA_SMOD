@@ -695,7 +695,7 @@ class Augmentation_SMOD():
             
             result_image, deformation_field, _ = self.registration(
                 fixed_image=A0, moving_image=moving_image, 
-                method="rigid", plot=False)
+                method="rigid")
             registered_set.append(result_image)
 
         # Obtain A1 by averaging registerd set IT0
@@ -719,7 +719,7 @@ class Augmentation_SMOD():
                 
                 result_image, deformation_field, _ = self.registration(
                     fixed_image=An, moving_image=registered_set[i], 
-                    method="affine", plot=False)  # ?Affine
+                    method="affine")  # ?Affine
                 re_registered_set.append(result_image)
 
             A_new_array = sum(np.asarray(re_registered_set)) / len(np.asarray(re_registered_set)) 
