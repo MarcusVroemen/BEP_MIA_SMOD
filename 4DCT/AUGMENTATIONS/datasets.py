@@ -15,9 +15,6 @@ import sys
 import torch.nn as nn
 import torch.nn.functional as F
 
-# import datasets_utils as DU 
-
-
 def to_cpu(img):
     img = img.squeeze().detach().cpu()
     return img
@@ -135,7 +132,7 @@ class SpatialTransformer(nn.Module):
             new_locs = new_locs.permute(0, 2, 3, 4, 1)
             new_locs = new_locs[..., [2, 1, 0]]
 
-        return F.grid_sample(src.to("cuda"), new_locs, align_corners=True, mode=self.mode)
+        return F.grid_sample(src, new_locs, align_corners=True, mode=self.mode)
 
 class Dataset(torch.utils.data.Dataset):
     """
@@ -148,8 +145,6 @@ class Dataset(torch.utils.data.Dataset):
         self.save_augmented = save_augmented
         if self.augmenter is not None:
             self.augment = True
-        else:
-            self.augment = False
 
     def adjust_shape(self, multiple_of=16):
         new_shape = tuple([int(np.ceil(shp / multiple_of) * multiple_of) for shp in self.inshape])
@@ -193,12 +188,6 @@ class Dataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.fixed_img)
-
-    def save_nifti(self, img, fname):
-        if torch.is_tensor(img):
-            img = img.cpu().numpy()
-        img_sitk = sitk.GetImageFromArray(img)
-        sitk.WriteImage(img_sitk, fileName=fname)
 
     def __getitem__(self, i):
         # Get image paths and load images
@@ -245,10 +234,8 @@ class DatasetLung(Dataset):
         self.version = version
         self.phases = phases
         self.organ_list = []
-        # self.img_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/image/***'
-        # self.landmarks_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/landmarks/***'
-        self.img_folder = f'{root_data}/{train_val_test}/image/***'
-        self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
+        self.img_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/image/***'
+        self.landmarks_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/landmarks/***'
         self.init_paths()
         self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
 
@@ -423,37 +410,36 @@ class GrydsPhysicsInformed():
         This function generates synthetic displacement vector fields (DVFs) and
         deformed images and returns them.
         '''
-        # assert self.dims == 3, "The model is only implemented for 3D data" #!
-        # img_shape = self.inshape 
-        img_shape = np.array((160,128,160))#!
+        assert self.dims == 3, "The model is only implemented for 3D data"
+        img_shape = self.inshape
 
         if augment_or_respiratory == 'augment':
             bspline_params = self.generate_bspline_params_augment(grid_size=self.grid_size[augment_or_respiratory],
                                                           max_deform_base=self.max_deform_base[augment_or_respiratory],
                                                           zyx_factor=[4, 2, 1])
-            DVF = self.generate_DVF_from_bspline_param(bspline_params=bspline_params, #!
+            DVF = self.generate_bspline_params_aug(bspline_params=bspline_params,
                                                        grid_size=self.grid_size[augment_or_respiratory],
                                                        img_shape=img_shape)
         elif augment_or_respiratory == 'respiratory':
 
-            bspline_params_coarse = self.generate_bspline_params_respiratory(grid_size=self.grid_size['resp_coarse'], #!
+            bspline_params_coarse = self.generate_bspline_params_respiratory(grid_size=self.grid_size['coarse'],
                                                                     grid_type ='coarse',
-                                                                    # experiment = self.args.experiment, #!
-                                                                    max_deform_base=self.max_deform_base['resp_coarse'], #!
+                                                                    experiment = self.args.experiment,
+                                                                    max_deform_base=self.max_deform_base['coarse'],
                                                                     zyx_factor = [4, 2, 1])
 
-            bspline_params_fine = self.generate_bspline_params_respiratory(grid_size=self.grid_size['resp_fine'], #!
+            bspline_params_fine = self.generate_bspline_params_respiratory(grid_size=self.grid_size['fine'],
                                                                   grid_type = 'fine',
-                                                                #   experiment = self.args.experiment, #!
-                                                                  max_deform_base=self.max_deform_base['resp_fine'], #!
-                                                                  zyx_factor = [1, 1, 1])
-                                                                #   zero_borders=self.args.zero_borders) #!
+                                                                  experiment = self.args.experiment,
+                                                                  max_deform_base=self.max_deform_base['fine'],
+                                                                  zyx_factor = [1, 1, 1],
+                                                                  zero_borders=self.args.zero_borders)
 
             DVF_coarse = self.generate_DVF_from_bspline_param(bspline_params=bspline_params_coarse,
-                                                              grid_size=self.grid_size['resp_coarse'], #!
+                                                              grid_size=self.grid_size['coarse'],
                                                               img_shape=img_shape)
             DVF_fine = self.generate_DVF_from_bspline_param(bspline_params=bspline_params_fine,
-                                                            grid_size=self.grid_size['resp_fine'], #!
+                                                            grid_size=self.grid_size['fine'],
                                                             img_shape=img_shape)
             DVF, DVF_coarse_transformed = self.composed_transform(DVF_coarse, DVF_fine)
         return DVF
@@ -464,8 +450,7 @@ class Augmentation(GrydsPhysicsInformed):
         super().__init__(args)
         self.args = args
         self.sig_noise = sig_noise
-        # self.transformer = SpatialTransformer(self.inshape).to(self.args.device)
-        self.transformer = SpatialTransformer(np.array((160,128,160))).to(self.args.device) #!
+        self.transformer = SpatialTransformer(self.inshape).to(self.args.device)
 
     def save_nifti(self, img, fname):
         if torch.is_tensor(img):
@@ -500,10 +485,8 @@ class Augmentation(GrydsPhysicsInformed):
         return DVF * delta
 
     def generate_on_the_fly(self, img):
-        # DVF_augment = self.generate_DVF(img, 'augment')
-        # DVF_respiratory = self.generate_DVF(img, 'respiratory')
-        DVF_augment = self.generate_DVF('augment') #!
-        DVF_respiratory = self.generate_DVF('respiratory')
+        DVF_augment = self.generate_DVF(img, 'augment')
+        DVF_respiratory = self.generate_DVF(img, 'respiratory')
         return DVF_augment, DVF_respiratory
 
     def composed_transform(self, DVF1, DVF2):
@@ -529,34 +512,31 @@ if __name__ == '__main__':
     # example of original dataset without augmentation
     dataset_original = DatasetLung(train_val_test='train', version='',
                                    root_data=args.dataroot, augmenter=None, phases='in_ex')
-    # img_data_T00, img_data_T50, img_data_T90 = prepara_traindata(root_data=root_data)
-    # moving, fixed = img_data_T00[0], img_data_T50[0]
     moving, fixed = dataset_original[0]
 
     fig, axs = plt.subplots(1, 2)
-    axs[0].imshow(moving[0,:,64,:], cmap='gray')
-    axs[1].imshow(fixed[0,:,64,:], cmap='gray')
+    axs[0].imshow(moving[80, ...], cmap='gray')
+    axs[1].imshow(fixed[80, ...], cmap='gray')
     fig.show()
 
     # example of synthetic data (augmented)
     augmenter = Augmentation(args)
     dataset_synthetic = DatasetLung(train_val_test='train', version='',
                                    root_data=args.dataroot, augmenter=augmenter, save_augmented=True, phases='in_ex')
-    # moving_synth, fixed_synth = dataset_original[0]
-    for i in range(len(dataset_original)):
-        moving_synth, fixed_synth = dataset_synthetic[i]
-        moving_synth = moving_synth.to("cpu")
-        fixed_synth = fixed_synth.to("cpu")
+    moving_synth, fixed_synth = dataset_original[0]
 
-        fig, axs = plt.subplots(2, 2)
-        axs[0,0].imshow(moving[0,:,64,:], cmap='gray')
-        axs[0,0].set_title('moving')
-        axs[0, 1].imshow(fixed[0,:,64,:], cmap='gray')
-        axs[0, 1].set_title('fixed')
-        axs[1, 0].imshow(moving_synth[0,:,64,:], cmap='gray')
-        axs[1, 0].set_title('moving_synth')
-        axs[1, 1].imshow(fixed_synth[0,:,64,:], cmap='gray')
-        axs[1, 1].set_title('fixed_synth')
-        fig.show()
+    fig, axs = plt.subplots(2, 2)
+    axs[0,0].imshow(moving[80, ...], cmap='gray')
+    axs[0,0].title('moving')
+    axs[0, 1].imshow(fixed[80, ...], cmap='gray')
+    axs[0, 1].title('fixed')
+    axs[1, 0].imshow(moving_synth[80, ...], cmap='gray')
+    axs[1, 0].title('moving_synth')
+    axs[1, 1].imshow(fixed_synth[80, ...], cmap='gray')
+    axs[1, 1].title('fixed_synth')
+    fig.show()
+
+
+
 
 

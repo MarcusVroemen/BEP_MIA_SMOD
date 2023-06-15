@@ -31,7 +31,8 @@ import itk
 import gryds
 import nibabel as nib
 import scipy.ndimage as ndi
-
+# import matplotlib
+# matplotlib.use('TkAgg')
 plt.rcParams['image.cmap'] = 'gray'
 
 class Dataset(torch.utils.data.Dataset):
@@ -87,6 +88,9 @@ class Dataset(torch.utils.data.Dataset):
         self.fixed_lbl = temp
 
     def __len__(self):
+        # if self.augment=="SMOD":
+        #     return len(self.fixed_img)*self.augmenter.num_augmentations
+        # else: #! change dataset size?
         return len(self.fixed_img)
 
     def save_nifti(self, img, fname):
@@ -135,8 +139,8 @@ class Dataset(torch.utils.data.Dataset):
             return moving_t, fixed_t
         
         elif self.augment=="SMOD":
-            img_artificial_T00 = self.augmenter.generate_single_augmented_T00()
-            img_artificial_T50 = self.augmenter.generate_single_augmented_T50(imgs_T00a=img_artificial_T00)
+            img_artificial_T00 = self.augmenter.generate_single_augmented_T00(img_T00=self.augmenter.DVF_T00_components) #? gaat het goed als ik hier niet meer de components bij hoef te doen?
+            img_artificial_T50 = self.augmenter.generate_single_augmented_T50(imgs_T00a=img_artificial_T00, img_T00a=self.augmenter.DVF_T50_components)
             
             if self.plot:
                 self.augmenter.plot_data_augmpairs(img_artificial_T00, img_artificial_T50, title="T00a and T50a")
@@ -147,8 +151,8 @@ class Dataset(torch.utils.data.Dataset):
             
 
 class DatasetLung(Dataset):
-    def __init__(self, train_val_test, root_data, version="2.1D", augmenter=None, save_augmented=False, phases='in_ex'):
-        super().__init__(train_val_test, augmenter, save_augmented)
+    def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, version="2.1D", phases='in_ex'):
+        super().__init__(train_val_test, augmenter, augment, save_augmented)
         self.set = 'lung'
         self.extension = '.nii.gz'
         self.root_data = root_data
@@ -239,22 +243,9 @@ class DatasetLung(Dataset):
         self.moving_img, self.fixed_img = [self.moving_img[i]], [self.fixed_img[i]]
         self.moving_pts, self.fixed_pts = [self.moving_pts[i]], [self.fixed_pts[i]]
 
-def prepara_traindata(root_data):
-    train_dataset = DatasetLung('train', root_data=root_data, phases="in_ex")
-
-    img_data_T00, img_data_T50, img_data_T90 = [], [], []
-    for i in range(len(train_dataset)):
-        img_fixed, img_moving = train_dataset[i]
-        img_data_T00.append(img_fixed.squeeze(0).numpy()), img_data_T50.append(img_moving.squeeze(0).numpy())  #fixed T50 are dubble, moving T00 and T90       
-
-    img_data_T00 = [itk.image_from_array(arr) for arr in img_data_T00]
-    img_data_T50 = [itk.image_from_array(arr) for arr in img_data_T50]
-    
-    return img_data_T00, img_data_T50
-
 class GrydsPhysicsInformed():
-    def __init__(self, args, **kwargs):
-        self.args = args
+    def __init__(self, **kwargs):
+        # self.args = args
         self.max_deform_base = {'augment': kwargs.pop('max_deform_aug', 3.2),
                                'resp_coarse': kwargs.pop('max_deform_coarse', 3.2),
                                'resp_fine': kwargs.pop('max_deform_fine', 3.2)}
@@ -338,7 +329,7 @@ class GrydsPhysicsInformed():
         dvf_np = sitk.GetArrayFromImage(dvf).astype('float32')
         dvf_t = torch.from_numpy(dvf_np)
         dvf_t = dvf_t.permute(3, 2, 1, 0).unsqueeze(0)
-        return dvf_t.to(self.args.device)
+        return dvf_t.to("cuda")
 
     def generate_DVF(self, augment_or_respiratory):
         '''
@@ -381,12 +372,12 @@ class GrydsPhysicsInformed():
         return DVF
 
 class Augmentation_gryds(GrydsPhysicsInformed):
-    def __init__(self, args, sig_noise=0.005):
-        super().__init__(args)
-        self.args = args
+    def __init__(self, sig_noise=0.005):
+        super().__init__()
+        # self.args = args
         self.sig_noise = sig_noise
         # self.transformer = SpatialTransformer(self.inshape).to(self.args.device)
-        self.transformer = SpatialTransformer(np.array((160,128,160))).to(self.args.device) #!
+        self.transformer = SpatialTransformer(np.array((160,128,160))).to("cuda") #!
 
     def save_nifti(self, img, fname):
         if torch.is_tensor(img):
@@ -395,7 +386,7 @@ class Augmentation_gryds(GrydsPhysicsInformed):
         sitk.WriteImage(img_sitk, fileName=fname)
 
     def add_gaussian_noise(self, img):
-        noise = torch.from_numpy(np.random.normal(0, self.sig_noise, img.shape)).type(img.dtype).to(self.args.device)
+        noise = torch.from_numpy(np.random.normal(0, self.sig_noise, img.shape)).type(img.dtype).to("cuda")
         return img + noise
 
     def rescale_DVF(self, DVF, reverse=False):
@@ -434,11 +425,41 @@ class Augmentation_gryds(GrydsPhysicsInformed):
         return DVF, DVF1_transformed
 
 
-class SMOD():
-    def __init__(self, **kwargs):
-        i=1
+class Augmentation_SMOD():
+    def __init__(self, root_data, sigma1, sigma2, num_images, plot=False, load_atlas=True):
+        self.root_data = root_data
+        self.simga1 = sigma1
+        self.simga2 = sigma2
+        self.num_images = num_images
+        self.plot = plot
+        self.load_atlas = load_atlas
+        # Load train data
+        self.imgs_T00, self.imgs_T50 = self.load_traindata()
+        # Generate DVF components for T00 augmentation
+        self.DVF_T00_components, self.imgs_T00_to_atlas, self.DVFs_to_atlas = self.preprocessing_T00()
+        # Generate DVF components for T00 augmentation
+        self.DVF_T50_components = self.preprocessing_T50()
+    
+    # load data    
+    def load_traindata(self):
+        train_dataset = DatasetLung('train', root_data=self.root_data, phases="in_ex")
+
+        img_data_T00, img_data_T50, img_data_T90 = [], [], []
+        for i in range(len(train_dataset)):
+            img_fixed, img_moving = train_dataset[i]
+            # if i%2==0:
+            img_data_T00.append(img_fixed.squeeze(0).numpy()), img_data_T50.append(img_moving.squeeze(0).numpy())  #fixed T50 are dubble, moving T00 and T90       
+            # else:           
+            #     img_data_T90.append(img_fixed.squeeze(0).numpy())
+
+        img_data_T00 = [itk.image_from_array(arr) for arr in img_data_T00]
+        img_data_T50 = [itk.image_from_array(arr) for arr in img_data_T50]
+        # img_data_T90 = [itk.image_from_array(arr) for arr in img_data_T90]
+        
+        return img_data_T00, img_data_T50#, img_data_T90
+
     # Basic Elastix and Gryds functions
-    def registration(fixed_image, moving_image, method="rigid", plot=False, 
+    def registration(self, fixed_image, moving_image, method="rigid", 
                     parameter_path=None, output_directory=""):
         """Function that calls Elastix registration function
         Args:
@@ -446,40 +467,36 @@ class SMOD():
             method: string with either one of the standard registration methods
                 or the name of a parameter file
         """
-            
-        # print("Registration step start ")
-
+        self.fixed_image = fixed_image
+        self.moving_image = moving_image
         # Define parameter object
         parameter_object = itk.ParameterObject.New()
         if parameter_path != None:
             parameter_object.AddParameterFile(parameter_path)    #e.g. Par007.txt
         else:
-            # parameter_map = parameter_object.GetDefaultParameterMap(method)  # rigid
-            # parameter_object.AddParameterMap(parameter_map)
             parameter_object.SetParameterMap(parameter_object.GetDefaultParameterMap(method))
-        # print(parameter_object)
 
         # Registration
-        result_image, result_transform_parameters = itk.elastix_registration_method(
+        self.result_image, result_transform_parameters = itk.elastix_registration_method(
             fixed_image, moving_image,
             parameter_object=parameter_object, #number_of_threads=8, 
             log_to_console=True, output_directory=output_directory)
 
         # Deformation field
-        deformation_field = itk.transformix_deformation_field(moving_image, result_transform_parameters)
-        print("Registration step complete")
+        self.deformation_field = itk.transformix_deformation_field(moving_image, result_transform_parameters)
+        # print("Registration step complete")
 
-        # Jacobanian #? does not work always
-        # jacobians = itk.transformix_jacobian(moving_image, result_transform_parameters)
+        # Jacobanian #? does not work always 
+        # jacobians = itk.transformix_jacobian(moving_image, result_transform_parameters) #!
         # # Casting tuple to two numpy matrices for further calculations.
         # spatial_jacobian = np.asarray(jacobians[0]).astype(np.float32)
         # det_spatial_jacobian = np.asarray(jacobians[1]).astype(np.float32)
         # print("Number of foldings in transformation:",np.sum(det_spatial_jacobian < 0))
         
-        if plot:
-            SMOD.plot_registration(fixed_image, moving_image, result_image, deformation_field, full=True)
+        if self.plot:
+            self.plot_registration(self.fixed_image, self.moving_image, self.result_image, self.deformation_field, full=True)
 
-        return result_image, deformation_field, result_transform_parameters
+        return self.result_image, self.deformation_field, result_transform_parameters
 
     def DVF_conversion(DVF_itk): 
         """Converts DVF from itk to DVF usable with gryds"""
@@ -495,7 +512,7 @@ class SMOD():
 
         return DVF_gryds
 
-    def transform(DVF_itk, img_moving, plot=False):
+    def transform(self, DVF_itk, img_moving):
         """Transform an image with a DVF using the gryds library
         Since the gryds format for DVFs is different to ITK, first the DVF is scaled
         Args:
@@ -503,22 +520,27 @@ class SMOD():
                 (converted to displacments scaled to image size with DVF_conversion)
             img_moving: to transform image
         """
-        DVF_gryds = SMOD.DVF_conversion(DVF_itk)
+        DVF_gryds = self.DVF_conversion(DVF_itk)
 
         bspline_transformation = gryds.BSplineTransformation(DVF_gryds)
         an_image_interpolator = gryds.Interpolator(img_moving)
         img_deformed = an_image_interpolator.transform(bspline_transformation)
-        if plot:
-            SMOD.plot_registration(fixed_image=img_moving, moving_image=img_deformed, deformation_field=DVF_itk, full=True, 
+        if self.plot:
+            self.plot_registration(fixed_image=img_moving, moving_image=img_deformed, deformation_field=DVF_itk, full=True, 
                                 result_image=np.asarray(img_moving) - np.asarray(img_deformed), title="transformation with averaged atlas DVF",
                                 name1="train image", name2="result image", name3="subtracted image", name4="average atlas DVF")
         return img_deformed
 
-    def plot_registration(fixed_image, moving_image, result_image, deformation_field,
+    def plot_registration(self, fixed_image, moving_image, result_image, deformation_field,
             name1="fixed image", name2="moving image", name3="result image", name4="deformation field",
             title="In- and output of registration - frontal/transverse/saggital" , full=True):
         """Plot fixed, moving result image and deformation field
         Called after registration to see result"""
+        
+        fixed_image = self.fixed_image
+        moving_image = self.moving_image
+        result_image = self.result_image
+        deformation_field = self.deformation_field
         
         if full==False:
             fig, axs = plt.subplots(2, 2)
@@ -565,7 +587,7 @@ class SMOD():
         plt.tight_layout()
         plt.show()
 
-    def validate_DVFs(DVFs, DVFs_inverse, img_moving):
+    def validate_DVFs(self, DVFs, DVFs_inverse, img_moving):
         """Plot DVFs and inverse with effect on images to validate them
         Args:
             DVFs: itk or array type DVFs that register imgs to atlas
@@ -576,23 +598,23 @@ class SMOD():
         for i in range(len(DVFs)):
             # DVF and img+DVF
             ax[i,0].imshow(np.asarray(DVFs[i])[:,64,:,2])
-            img_ogDVF = SMOD.transform(DVF_itk=DVFs[i], img_moving=img_moving, plot=False)
+            img_ogDVF = self.transform(DVF_itk=DVFs[i], img_moving=img_moving, plot=False)
             ax[i,1].imshow(img_ogDVF[:,64,:])
             ax[i,1].set_title("original deformed with DVF")
             # DVFinverse and img+DVFinverse
             ax[i,2].imshow(np.asarray(DVFs_inverse[i])[:,64,:,2])
-            img_invDVF = SMOD.transform(DVF_itk=DVFs_inverse[i], img_moving=img_moving, plot=False)
+            img_invDVF = self.transform(DVF_itk=DVFs_inverse[i], img_moving=img_moving, plot=False)
             ax[i,3].imshow(img_invDVF[:,64,:])
             ax[i,3].set_title("original deformed with DVFinv")
             # img+DVFinverse+DVF
-            img_3 = SMOD.transform(DVF_itk=DVFs[i], img_moving=img_invDVF, plot=False)
+            img_3 = self.transform(DVF_itk=DVFs[i], img_moving=img_invDVF, plot=False)
             ax[i,4].imshow(img_3[:,64,:])
             ax[i,4].set_title("original deformed with DVFinf and DVF")
         plt.tight_layout()
         plt.show()
 
     # Atlas generation
-    def generate_atlas(img_data):
+    def generate_atlas(self, img_data):
         """Generate atlas image from list of images
 
         Args:
@@ -612,7 +634,7 @@ class SMOD():
         for img in img_data:
             moving_image = img
             
-            result_image, deformation_field, _ = SMOD.registration(
+            result_image, deformation_field, _ = self.registration(
                 fixed_image=A0, moving_image=moving_image, 
                 method="rigid", plot=False)
             registered_set.append(result_image)
@@ -636,7 +658,7 @@ class SMOD():
                 print("Iteration {} image {}/{}".format(iteration, i+1, len(registered_set)))
                 # Perform registration
                 
-                result_image, deformation_field, _ = SMOD.registration(
+                result_image, deformation_field, _ = self.registration(
                     fixed_image=An, moving_image=registered_set[i], 
                     method="affine", plot=False)  # ?Affine
                 re_registered_set.append(result_image)
@@ -644,7 +666,7 @@ class SMOD():
             A_new_array = sum(np.asarray(re_registered_set)) / len(np.asarray(re_registered_set)) 
             A_new = itk.image_from_array(A_new_array.astype(np.float32))
             
-            SMOD.plot_registration(An, A_new, np.asarray(An) - np.asarray(A_new), deformation_field, full=False)
+            self.plot_registration(An, A_new, np.asarray(An) - np.asarray(A_new), deformation_field, full=False)
             
             iteration += 1
 
@@ -658,16 +680,15 @@ class SMOD():
         print("Atlas generation complete/n")
         return An
 
-    def register_to_atlas(img_data, img_atlas, root_data, method="affine", plot=True, inverse=True):
+    def register_to_atlas(self, img_atlas, method="affine", inverse=True):
         """Generate DVFs from set images registered on atlas image"""
-        params_path = root_data.replace("data","transform_parameters")
+        params_path = self.root_data.replace("data","transform_parameters")
         DVFs_list, DVFs_inverse_list, imgs_to_atlas = [], [], []
 
-        for i in range(len(img_data)):
-            result_image, DVF, result_transform_parameters = SMOD.registration(
-                fixed_image=img_atlas, moving_image=img_data[i], 
-                method=method, plot=plot, 
-                output_directory=params_path)
+        for i in range(len(self.imgs_T00)):
+            result_image, DVF, result_transform_parameters = self.registration(
+                fixed_image=img_atlas, moving_image=self.imgs_T00[i], 
+                method=method, output_directory=params_path)
             DVFs_list.append(DVF)
             imgs_to_atlas.append(result_image)
             
@@ -677,20 +698,22 @@ class SMOD():
                 parameter_map = parameter_object.GetDefaultParameterMap(method)
                 parameter_map['HowToCombineTransforms'] = ['Compose']
                 parameter_object.AddParameterMap(parameter_map)
+                
                 inverse_image, inverse_transform_parameters = itk.elastix_registration_method(
-                    img_data[i], img_data[i],
+                    self.imgs_T00[i], self.imgs_T00[i],
                     parameter_object=parameter_object,
                     initial_transform_parameter_file_name=params_path+"TransformParameters.0.txt")
+                
                 inverse_transform_parameters.SetParameter(
                     0, "InitialTransformParametersFileName", "NoInitialTransform")
-                DVF_inverse = itk.transformix_deformation_field(img_data[i], inverse_transform_parameters)
+                DVF_inverse = itk.transformix_deformation_field(self.imgs_T00[i], inverse_transform_parameters)
                 DVFs_inverse_list.append(DVF_inverse)
             
             
         return DVFs_list, DVFs_inverse_list, imgs_to_atlas
 
     # DVF generation
-    def dimreduction(DVFs):
+    def dimreduction(self, DVFs):
         """Apply PCA to get DVF values for expression of DVF generation
         Args:
             DVFs (list): list with DVF's either in shape (160, 128, 160, 3) or itk.itkImagePython.itkImageVF33
@@ -758,7 +781,7 @@ class SMOD():
         return DVFs_artificial
 
     # IMG generation
-    def generate_artificial_imgs(imgs_to_atlas, DVFs_artificial_inverse, img_data="", plot=False, breathing=False):
+    def generate_artificial_imgs(self, imgs_to_atlas, DVFs_artificial_inverse, img_data="", breathing=False):
         """Use DVFs and images registered to atlas to generate artificial images
         Args:
             imgs_to_atlas: images generated by registering them to atlas image
@@ -772,18 +795,18 @@ class SMOD():
         for i in range(len(imgs_to_atlas)):
             if breathing==False:
                 for j in range(len(DVFs_artificial_inverse)):
-                    img_artificial = SMOD.transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=imgs_to_atlas[i], plot=False)
+                    img_artificial = self.transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=imgs_to_atlas[i], plot=False)
                     imgs_artificial.append(img_artificial)
                     counter+=1
                     print("Image {}/{} created".format(counter, len(imgs_to_atlas)*len(DVFs_artificial_inverse)))
-                    if plot:
-                        SMOD.plot_registration(fixed_image=img_data[i], moving_image=imgs_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
+                    if self.plot:
+                        self.plot_registration(fixed_image=img_data[i], moving_image=imgs_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
                                             name1="T00 original", name2="T00 to atlas", name3="artificial T00", name4="artificial DVF",
                                             title="Creating artificial images", full=True)
             else:
                 # When generating artificial T50a, we want 1 T50a for every T10a where there are n times more artificial DVFs
                 # Therefore dont also loop over DVFs
-                img_artificial = SMOD.transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=imgs_to_atlas[i], plot=False)
+                img_artificial = self.transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=imgs_to_atlas[i], plot=False)
                 j+=1
                 if j==len(DVFs_artificial_inverse):
                     j=0
@@ -792,14 +815,14 @@ class SMOD():
                 counter+=1
                 
                 print("Image {}/{} created".format(counter, len(imgs_to_atlas)))
-                if plot:
-                    SMOD.plot_registration(fixed_image=img_data[i], moving_image=imgs_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
+                if self.plot:
+                    self.plot_registration(fixed_image=img_data[i], moving_image=imgs_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
                                         name1="T00 original", name2="T00 to atlas", name3="artificial T00", name4="artificial DVF",
                                         title="Creating artificial images", full=True)
         return imgs_artificial 
 
     # MAIN functions  
-    def preprocessing_T00(self, imgs_T00):
+    def preprocessing_T00(self):
         """Preprocessing of data augmentation which created the components for artificial DVFs and imgs_to_atlas
         Split from the data_augm_generation since these components only have to be made once which can be done as preprocessing step
         Function includes: (1) atlas generation, (2) registration to atlas, (3) calculate components for artificial DVFs
@@ -811,50 +834,45 @@ class SMOD():
             imgs_to_atlas (list with itk images): original training data registered to atlas
         """
         # (1) Generate or get atlas image
-        print("Generating atlas")
-        img_atlas = SMOD.generate_atlas(img_data=imgs_T00)
+        print("Generating atlas image")
+        if self.load_atlas==True:
+            img_atlas = self.generate_atlas(img_data=self.imgs_T00)
+        else:
+            # Load already generated atlas image
+            img_atlas = nib.load(self.root_data+'atlas/atlasv1.nii.gz')
+            img_atlas = img_atlas.get_fdata()
+            img_atlas = itk.image_from_array(ndi.rotate((img_atlas).astype(np.float32),0)) # itk.itkImagePython.itkImageF3
+            plt.imshow(img_atlas[:,64,:])
 
         
         # (2) Register to atlas for DVFinverse and imgs_to_atlas  
-        print("Generating artificial images")  
-        DVFs, DVFs_inverse, imgs_to_atlas = SMOD.register_to_atlas(img_data=imgs_T00, img_atlas=img_atlas)
+        print("Regestration of T00 images to atlas")  
+        DVFs, DVFs_inverse, imgs_to_atlas = self.register_to_atlas(img_atlas=img_atlas)
         
         # Optionally validate DVFs and DVFs_inverse (uncomment next line)
-        # SMOD.validate_DVFs(DVFs, DVFs_inverse, img_moving=imgs_T00[0])
+        # self.validate_DVFs(DVFs, DVFs_inverse, img_moving=imgs_T00[0])
         
         # (3) Get components needed for artificial DVF generation
         print("Generating artificial DVF components")
-        DVF_T00_components = SMOD.dimreduction(DVFs=DVFs_inverse)
+        DVF_T00_components = self.dimreduction(DVFs=DVFs_inverse)
         
         return DVF_T00_components, imgs_to_atlas, DVFs
 
-    def preprocessing_T50(imgs_T00, imgs_T50):
+    def preprocessing_T50(self):
         # register T00 to T50 with bspline to get the breathing motion
         DVFs_breathing=[]
-        for i in range(len(imgs_T00)):
-            result_image, DVF_breathing, result_transform_parameters = SMOD.registration(
-                fixed_image=imgs_T50[i], moving_image=imgs_T00[i], 
-                method="bspline", plot=True)#, parameter_path=parameter_path_base+parameter_file)
+        for i in range(len(self.imgs_T00)):
+            result_image, DVF_breathing, result_transform_parameters = self.registration(
+                fixed_image=self.imgs_T50[i], moving_image=self.imgs_T00[i], 
+                method="bspline")#, parameter_path=parameter_path_base+parameter_file)
             DVFs_breathing.append(DVF_breathing)
 
         # generate artificial DVFs that model breathing motion from T00 to T50
         print("Generating artificial DVFs - breathing motion")
-        DVF_T50_components = SMOD.dimreduction(DVFs=DVFs_breathing)
+        DVF_T50_components = self.dimreduction(DVFs=DVFs_breathing)
         return DVF_T50_components
 
-
-class Augmentation_SMOD(SMOD):
-    def __init__(self, imgs_T00, imgs_T50, simga1, simga2, num_images, plot=False):
-        super().__init__()
-        self.simga1 = simga1
-        self.simga2 = simga2
-        self.num_images = num_images
-        self.imgs_T00 = imgs_T00
-        self.imgs_T50 = imgs_T50
-        self.DVF_T00_components, self.imgs_T00_to_atlas, self.DVFs_to_atlas = self.preprocessing_T00(img_data=self.imgs_T00)
-        self.DVF_T50_components = self.preprocessing_T50(self.imgs_T50)
-        self.plot = plot
-
+    # Phase generation
     def generate_single_augmented_T00(self, img_T00):
         """Generate artificial training data with on the spot
         Contains random component sigma so imgs_artificial are never the same
@@ -867,7 +885,7 @@ class Augmentation_SMOD(SMOD):
         """
         # Generate artificial DVFs
         print("Generating artificial DVFs")
-        DVF_artificial = SMOD.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T00_components, 
+        DVF_artificial = self.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T00_components, 
                                                 num_images=1, sigma=self.sigma1)
 
         if self.plot:
@@ -877,16 +895,16 @@ class Augmentation_SMOD(SMOD):
             img_grid[:, :, ::line_interval] = 1
             img_grid[::line_interval, :, :] = 1
             for i in range(len(DVF_artificial)):
-                SMOD.transform(DVF_artificial[i], img_grid, plot=self.plot)
+                self.transform(DVF_artificial[i], img_grid)
         
         # generate artificial images
         print("Generating artificial images")
-        img_artificial_T00 = SMOD.generate_artificial_imgs(imgs_to_atlas=img_T00, DVFs_artificial_inverse=DVF_artificial)
+        img_artificial_T00 = self.generate_artificial_imgs(imgs_to_atlas=img_T00, DVFs_artificial_inverse=DVF_artificial)
 
         return img_artificial_T00
 
     def generate_single_augmented_T50(self, img_T00a):
-        DVF_artificial_breathing = SMOD.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T50_components, 
+        DVF_artificial_breathing = self.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T50_components, 
                                                 num_images=1, sigma=self.sigma2)
         
         if self.plot: #plot dvf on grid
@@ -896,12 +914,11 @@ class Augmentation_SMOD(SMOD):
             img_grid[:, :, ::line_interval] = 1
             img_grid[::line_interval, :, :] = 1
             for i in range(len(DVF_artificial_breathing)):
-                SMOD.transform(DVF_artificial_breathing[i], img_grid, plot=self.plot)
+                self.transform(DVF_artificial_breathing[i], img_grid)
 
         # apply artificial breathing motion to T00a
-        img_artificial_T50 = SMOD.generate_artificial_imgs(imgs_to_atlas=img_T00a, DVFs_artificial_inverse=DVF_artificial_breathing, plot=False, breathing=True)
+        img_artificial_T50 = self.generate_artificial_imgs(imgs_to_atlas=img_T00a, DVFs_artificial_inverse=DVF_artificial_breathing, plot=False, breathing=True)
         return img_artificial_T50
-
 
     def generate_augmented_T00(self, img_data=None):
         """Generate artificial training data with on the spot
@@ -915,7 +932,7 @@ class Augmentation_SMOD(SMOD):
         """
         # Generate artificial DVFs
         print("Generating artificial DVFs")
-        DVFs_artificial = SMOD.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T00_components, 
+        DVFs_artificial = self.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T00_components, 
                                                 num_images=self.num_images, sigma=self.sigma1)
 
         if self.plot:
@@ -925,16 +942,16 @@ class Augmentation_SMOD(SMOD):
             img_grid[:, :, ::line_interval] = 1
             img_grid[::line_interval, :, :] = 1
             for i in range(len(DVFs_artificial)):
-                SMOD.transform(DVFs_artificial[i], img_grid, plot=self.plot)
+                self.transform(DVFs_artificial[i], img_grid)
         
         # generate artificial images
         print("Generating artificial images")
-        imgs_artificial_T00 = SMOD.generate_artificial_imgs(imgs_to_atlas=self.imgs_to_atlas, DVFs_artificial_inverse=DVFs_artificial, img_data=img_data, plot=False)
+        imgs_artificial_T00 = self.generate_artificial_imgs(imgs_to_atlas=self.imgs_to_atlas, DVFs_artificial_inverse=DVFs_artificial, img_data=img_data, plot=False)
 
         return imgs_artificial_T00
     
     def generate_augmented_T50(self, imgs_T00a):
-        DVFs_artificial_breathing = SMOD.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T50_components, 
+        DVFs_artificial_breathing = self.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T50_components, 
                                                 num_images=self.num_images, sigma=self.sigma2)
         
         if self.plot: #plot dvf on grid
@@ -944,10 +961,10 @@ class Augmentation_SMOD(SMOD):
             img_grid[:, :, ::line_interval] = 1
             img_grid[::line_interval, :, :] = 1
             for i in range(len(DVFs_artificial_breathing)):
-                SMOD.transform(DVFs_artificial_breathing[i], img_grid, plot=self.plot)
+                self.transform(DVFs_artificial_breathing[i], img_grid)
 
         # apply artificial breathing motion to T00a
-        imgs_artificial_T50 = SMOD.generate_artificial_imgs(imgs_to_atlas=imgs_T00a, DVFs_artificial_inverse=DVFs_artificial_breathing, plot=False, breathing=True)
+        imgs_artificial_T50 = self.generate_artificial_imgs(imgs_to_atlas=imgs_T00a, DVFs_artificial_inverse=DVFs_artificial_breathing, plot=False, breathing=True)
         return imgs_artificial_T50
 
     # Plotting and writing final data
@@ -1022,25 +1039,27 @@ if __name__ == '__main__':
     dataset_original = DatasetLung(train_val_test='train', version='',
                                    root_data=root_data, augmenter=None, phases='in_ex')
     moving, fixed = dataset_original[0]
-
+    print("Lentgh of original dataset: ", len(dataset_original))
     fig, axs = plt.subplots(1, 2)
     axs[0].imshow(moving[0,:,64,:], cmap='gray')
+    axs[0].set_title('moving')
     axs[1].imshow(fixed[0,:,64,:], cmap='gray')
+    axs[1].set_title('fixed')
     fig.show()
 
     # # example of synthetic data (augmented)
+        
+    augmenter_SMOD = Augmentation_SMOD(root_data=root_data, 
+                                       simga1=15000, simga2=1500, num_images=1, 
+                                       plot=True, load_atlas=False)
+    dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
+                                    augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
+    
+    
     # # augmenter_gryds = Augmentation_gryds(args)
-    
-    img_data_T00, img_data_T50 = prepara_traindata(root_data=root_data)
-    
-    augmenter_SMOD = Augmentation_SMOD(imgs_T00=img_data_T00, imgs_T50=img_data_T50, simga1=15000, simga2=1500, num_images=1, plot=False)
-    
-    
     # dataset_synthetic = DatasetLung(train_val_test='train', version='', root_data=root_data, 
     #                                 augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
     
-    dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-                                    augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
     
     moving_synth, fixed_synth = dataset_synthetic_SMOD[0]
     for i in range(len(dataset_synthetic_SMOD)):
