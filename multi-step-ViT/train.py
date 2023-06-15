@@ -11,6 +11,10 @@ from model.utils import save_model, init_model#, set_level_sequential_training_2
 from utils.neptune import init_neptune
 from utils.utils import set_seed
 
+# import augmentation.GRYDS as AG
+# import augmentation.SMOD as AS
+import augmentations as AUG
+
 torch.backends.cudnn.benchmark = True  # speed ups
 
 # import os
@@ -61,12 +65,7 @@ parser.add_argument('--overfit', action='store_true', help='overfit on 1 image d
 #* Data augmentation 
 # parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
 parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
-
-# folder_augment="artificial/artificial_N5_S10000_1000"
-folder_augment="artificial/artificial_N10_S10000_1000"
-# folder_augment="artificial/artificial_N10_S15000_1500"
-# folder_augment="artificial/artificial_N10_S20000_2000"
-print(folder_augment)
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
 
 
 args = parser.parse_args()
@@ -86,11 +85,25 @@ if __name__ == "__main__":
     if args.dataset == 'lung':
         if args.augmentation == 'none':
             train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
-            val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+            
         elif args.augmentation == 'SMOD':
-            train_dataset = DatasetLung('train', folder_augment=folder_augment, root_data=args.root_data, version=args.version)
-            val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+            dataset_original = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, augmenter=None, phases='in_ex')
+            augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
+                                        sigma1=15000, sigma2=1500, num_images=1, 
+                                        plot=True, load_atlas=False)
+            train_dataset = DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
+                                        augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
+            
+            
+        elif args.augmentation == 'gryds':
+            augmenter_gryds = AUG.Augmentation_gryds(args)
+            dataset_synthetic = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
+                                        augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
+            
+    val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+
     print("Training dataset size: ", len(train_dataset))
+    
     train_dataset.adjust_shape(multiple_of=32)
     val_dataset.adjust_shape(multiple_of=32)
     if args.overfit:

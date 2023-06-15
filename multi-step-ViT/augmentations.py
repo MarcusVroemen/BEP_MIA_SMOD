@@ -9,8 +9,8 @@ import torch
 import argparse
 
 import sys
-from transformers import SpatialTransformer
-from utils import set_seed, read_pts
+# from transformers import SpatialTransformer #!
+# from utils import set_seed, read_pts   #!
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -31,9 +31,83 @@ import itk
 import gryds
 import nibabel as nib
 import scipy.ndimage as ndi
-# import matplotlib
-# matplotlib.use('TkAgg')
 plt.rcParams['image.cmap'] = 'gray'
+
+def set_seed(seed_value, pytorch=True):
+    """
+    Set seed for deterministic behavior
+
+    Parameters
+    ----------
+    seed_value : int
+        Seed value.
+    pytorch : bool
+        Whether the torch seed should also be set. The default is True.
+
+    Returns
+    -------
+    None.
+    """
+    import random
+    random.seed(seed_value)
+    np.random.seed(seed_value)
+    if pytorch:
+        torch.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value)
+        torch.backends.cudnn.deterministic = True
+
+def read_pts(file_name, skiprows=0):
+    return torch.tensor(np.loadtxt(file_name, skiprows=skiprows), dtype=torch.float32)
+
+class SpatialTransformer(nn.Module):
+    """
+    N-D Spatial Transformer
+    """
+
+    def __init__(self, size, mode='bilinear', fractional=False):
+        super().__init__()
+
+        self.mode = mode
+        self.fractional = fractional
+        # create sampling grid
+        if fractional:
+            vectors = [torch.arange(0, s) / (s - 1) for s in size]
+        else:
+            vectors = [torch.arange(0, s) for s in size]
+        grids = torch.meshgrid(vectors)
+        grid = torch.stack(grids)
+        grid = torch.unsqueeze(grid, 0)
+        grid = grid.type(torch.FloatTensor)
+
+        # registering the grid as a buffer cleanly moves it to the GPU, but it also
+        # adds it to the state dict. this is annoying since everything in the state dict
+        # is included when saving weights to disk, so the model files are way bigger
+        # than they need to be. so far, there does not appear to be an elegant solution.
+        # see: https://discuss.pytorch.org/t/how-to-register-buffer-without-polluting-state-dict
+        self.register_buffer('grid', grid)
+
+    def forward(self, src, flow):
+        # new locations
+        new_locs = self.grid + flow
+        shape = flow.shape[2:]
+
+        # need to normalize grid values to [-1, 1] for resampler
+        for i in range(len(shape)):
+            if self.fractional:
+                new_locs[:, i, ...] = 2 * (new_locs[:, i, ...] - 0.5)
+            else:
+                new_locs[:, i, ...] = 2 * (new_locs[:, i, ...] / (shape[i] - 1) - 0.5)
+
+        # move channels dim to last position
+        # also not sure why, but the channels need to be reversed
+        if len(shape) == 2:
+            new_locs = new_locs.permute(0, 2, 3, 1)
+            new_locs = new_locs[..., [1, 0]]
+        elif len(shape) == 3:
+            new_locs = new_locs.permute(0, 2, 3, 4, 1)
+            new_locs = new_locs[..., [2, 1, 0]]
+
+        return F.grid_sample(src, new_locs, align_corners=True, mode=self.mode)
 
 class Dataset(torch.utils.data.Dataset):
     """
@@ -88,9 +162,6 @@ class Dataset(torch.utils.data.Dataset):
         self.fixed_lbl = temp
 
     def __len__(self):
-        # if self.augment=="SMOD":
-        #     return len(self.fixed_img)*self.augmenter.num_augmentations
-        # else: #! change dataset size?
         return len(self.fixed_img)
 
     def save_nifti(self, img, fname):
@@ -115,9 +186,9 @@ class Dataset(torch.utils.data.Dataset):
         # Generate DVFs on the fly and apply to original moving image
         if self.augment=="gryds":
             DVF_augment, DVF_respiratory = self.augmenter.generate_on_the_fly(moving_t)
-            moving_t_new = self.augmenter.transformer(src=moving_t.unsqueeze(0), flow=DVF_augment).squeeze(0)
+            moving_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_augment).squeeze(0)
             DVF_composed, _ = self.augmenter.composed_transform(DVF_augment, DVF_respiratory)
-            fixed_t_new = self.augmenter.transformer(src=moving_t.unsqueeze(0), flow=DVF_composed).squeeze(0)
+            fixed_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_composed).squeeze(0)
             moving_t = moving_t_new
             fixed_t = fixed_t_new
 
@@ -139,17 +210,24 @@ class Dataset(torch.utils.data.Dataset):
             return moving_t, fixed_t
         
         elif self.augment=="SMOD":
-            img_artificial_T00 = self.augmenter.generate_single_augmented_T00(img_T00=self.augmenter.DVF_T00_components) #? gaat het goed als ik hier niet meer de components bij hoef te doen?
-            img_artificial_T50 = self.augmenter.generate_single_augmented_T50(imgs_T00a=img_artificial_T00, img_T00a=self.augmenter.DVF_T50_components)
+
+            img_artificial_inhaled = self.augmenter.generate_img_artificial(img_base=self.augmenter.imgs_inhaled_to_atlas[i],
+                                                                        DVF_components=self.augmenter.DVF_inhaled_components, 
+                                                                        sigma=self.augmenter.sigma1, breathing=False)
             
+            img_artificial_exhaled = self.augmenter.generate_img_artificial(img_base=img_artificial_inhaled,
+                                                                        DVF_components=self.augmenter.DVF_exhaled_components, 
+                                                                        sigma=self.augmenter.sigma2, breathing=True)
+            
+
             if self.plot:
-                self.augmenter.plot_data_augmpairs(img_artificial_T00, img_artificial_T50, title="T00a and T50a")
-            return img_artificial_T00, img_artificial_T50
+                self.augmenter.plot_data_augmpairs(img_artificial_inhaled, img_artificial_exhaled, title="Artificial inhaled and exhaled images")
+            
+            return img_artificial_inhaled, img_artificial_exhaled
             
         else:
             return moving_t, fixed_t
             
-
 class DatasetLung(Dataset):
     def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, version="2.1D", phases='in_ex'):
         super().__init__(train_val_test, augmenter, augment, save_augmented)
@@ -426,39 +504,25 @@ class Augmentation_gryds(GrydsPhysicsInformed):
 
 
 class Augmentation_SMOD():
-    def __init__(self, root_data, sigma1, sigma2, num_images, plot=False, load_atlas=True):
+    def __init__(self, root_data, original_dataset, sigma1, sigma2, num_images=1, plot=False, load_atlas=True):
         self.root_data = root_data
-        self.simga1 = sigma1
-        self.simga2 = sigma2
-        self.num_images = num_images
-        self.plot = plot
-        self.load_atlas = load_atlas
+
+        # image generation parameters
+        self.sigma1 = sigma1
+        self.sigma2 = sigma2
+        self.num_images = num_images    #can generate more artificial images a time #*old should remove
+        self.plot = plot                #plot registration and transformation steps
+        self.load_atlas = load_atlas    #wheather to generate atlas or load existing one
         # Load train data
-        self.imgs_T00, self.imgs_T50 = self.load_traindata()
-        # Generate DVF components for T00 augmentation
-        self.DVF_T00_components, self.imgs_T00_to_atlas, self.DVFs_to_atlas = self.preprocessing_T00()
-        # Generate DVF components for T00 augmentation
-        self.DVF_T50_components = self.preprocessing_T50()
+        self.imgs_inhaled, self.imgs_exhaled = zip(*[(itk.image_from_array(img_inhaled[0]), itk.image_from_array(img_exhaled[0])) 
+                                             for img_inhaled, img_exhaled in original_dataset])
+        # Generate DVF components for inhaled augmentation
+        self.DVF_inhaled_components, self.imgs_inhaled_to_atlas, self.DVFs_to_atlas = self.preprocessing_inhaled()
+        # Generate DVF components for exhaled augmentation
+        self.DVF_exhaled_components = self.preprocessing_exhaled()
     
-    # load data    
-    def load_traindata(self):
-        train_dataset = DatasetLung('train', root_data=self.root_data, phases="in_ex")
 
-        img_data_T00, img_data_T50, img_data_T90 = [], [], []
-        for i in range(len(train_dataset)):
-            img_fixed, img_moving = train_dataset[i]
-            # if i%2==0:
-            img_data_T00.append(img_fixed.squeeze(0).numpy()), img_data_T50.append(img_moving.squeeze(0).numpy())  #fixed T50 are dubble, moving T00 and T90       
-            # else:           
-            #     img_data_T90.append(img_fixed.squeeze(0).numpy())
-
-        img_data_T00 = [itk.image_from_array(arr) for arr in img_data_T00]
-        img_data_T50 = [itk.image_from_array(arr) for arr in img_data_T50]
-        # img_data_T90 = [itk.image_from_array(arr) for arr in img_data_T90]
-        
-        return img_data_T00, img_data_T50#, img_data_T90
-
-    # Basic Elastix and Gryds functions
+    # Basic Elastix and Gryds (library) functions
     def registration(self, fixed_image, moving_image, method="rigid", 
                     parameter_path=None, output_directory=""):
         """Function that calls Elastix registration function
@@ -467,8 +531,7 @@ class Augmentation_SMOD():
             method: string with either one of the standard registration methods
                 or the name of a parameter file
         """
-        self.fixed_image = fixed_image
-        self.moving_image = moving_image
+
         # Define parameter object
         parameter_object = itk.ParameterObject.New()
         if parameter_path != None:
@@ -477,13 +540,13 @@ class Augmentation_SMOD():
             parameter_object.SetParameterMap(parameter_object.GetDefaultParameterMap(method))
 
         # Registration
-        self.result_image, result_transform_parameters = itk.elastix_registration_method(
+        result_image, result_transform_parameters = itk.elastix_registration_method(
             fixed_image, moving_image,
             parameter_object=parameter_object, #number_of_threads=8, 
-            log_to_console=True, output_directory=output_directory)
+            log_to_console=False, output_directory=output_directory)
 
         # Deformation field
-        self.deformation_field = itk.transformix_deformation_field(moving_image, result_transform_parameters)
+        deformation_field = itk.transformix_deformation_field(moving_image, result_transform_parameters)
         # print("Registration step complete")
 
         # Jacobanian #? does not work always 
@@ -494,12 +557,13 @@ class Augmentation_SMOD():
         # print("Number of foldings in transformation:",np.sum(det_spatial_jacobian < 0))
         
         if self.plot:
-            self.plot_registration(self.fixed_image, self.moving_image, self.result_image, self.deformation_field, full=True)
+            self.plot_registration(fixed_image, moving_image, result_image, deformation_field, full=True)
 
-        return self.result_image, self.deformation_field, result_transform_parameters
+        return result_image, deformation_field, result_transform_parameters
 
-    def DVF_conversion(DVF_itk): 
-        """Converts DVF from itk to DVF usable with gryds"""
+    def DVF_conversion(self, DVF_itk): 
+        """Converts DVF from itk to DVF usable with gryds
+        Note that gryds is here the library used and not the alternte augmenation method gryds*"""
         # Reshapre DVF from (160, 128, 160, 3) to (3, 160, 128, 160)
         reshaped_DVF = np.transpose(np.asarray(DVF_itk), (3, 0, 1, 2))  
         
@@ -520,7 +584,7 @@ class Augmentation_SMOD():
                 (converted to displacments scaled to image size with DVF_conversion)
             img_moving: to transform image
         """
-        DVF_gryds = self.DVF_conversion(DVF_itk)
+        DVF_gryds = self.DVF_conversion(DVF_itk=DVF_itk)
 
         bspline_transformation = gryds.BSplineTransformation(DVF_gryds)
         an_image_interpolator = gryds.Interpolator(img_moving)
@@ -536,11 +600,6 @@ class Augmentation_SMOD():
             title="In- and output of registration - frontal/transverse/saggital" , full=True):
         """Plot fixed, moving result image and deformation field
         Called after registration to see result"""
-        
-        fixed_image = self.fixed_image
-        moving_image = self.moving_image
-        result_image = self.result_image
-        deformation_field = self.deformation_field
         
         if full==False:
             fig, axs = plt.subplots(2, 2)
@@ -680,14 +739,14 @@ class Augmentation_SMOD():
         print("Atlas generation complete/n")
         return An
 
-    def register_to_atlas(self, img_atlas, method="affine", inverse=True):
+    def register_to_atlas(self, method="affine", inverse=True):
         """Generate DVFs from set images registered on atlas image"""
         params_path = self.root_data.replace("data","transform_parameters")
         DVFs_list, DVFs_inverse_list, imgs_to_atlas = [], [], []
 
-        for i in range(len(self.imgs_T00)):
+        for i in range(len(self.imgs_inhaled)):
             result_image, DVF, result_transform_parameters = self.registration(
-                fixed_image=img_atlas, moving_image=self.imgs_T00[i], 
+                fixed_image=self.img_atlas, moving_image=self.imgs_inhaled[i], 
                 method=method, output_directory=params_path)
             DVFs_list.append(DVF)
             imgs_to_atlas.append(result_image)
@@ -700,13 +759,13 @@ class Augmentation_SMOD():
                 parameter_object.AddParameterMap(parameter_map)
                 
                 inverse_image, inverse_transform_parameters = itk.elastix_registration_method(
-                    self.imgs_T00[i], self.imgs_T00[i],
+                    self.imgs_inhaled[i], self.imgs_inhaled[i],
                     parameter_object=parameter_object,
                     initial_transform_parameter_file_name=params_path+"TransformParameters.0.txt")
                 
                 inverse_transform_parameters.SetParameter(
                     0, "InitialTransformParametersFileName", "NoInitialTransform")
-                DVF_inverse = itk.transformix_deformation_field(self.imgs_T00[i], inverse_transform_parameters)
+                DVF_inverse = itk.transformix_deformation_field(self.imgs_inhaled[i], inverse_transform_parameters)
                 DVFs_inverse_list.append(DVF_inverse)
             
             
@@ -756,11 +815,10 @@ class Augmentation_SMOD():
 
         return DVF_mean, DVF_Ud
 
-    def generate_artificial_DVFs(DVFs_artificial_components, num_images, sigma):
+    def generate_artificial_DVFs(self, DVFs_artificial_components, sigma):
         """Generate artificial DVFs from list with to_atlas_DVFs
         Args:
             DVFs_artificial_components (list with arrays): DVF_mean, DVF_Ud from dimreduction()
-            num_images (int): amount of artificial DVFs to generate
             sigma (int): random scaling component 100: visual deformations, 500: too much
             DVFs (list): list with DVF's either in shape (160, 128, 160, 3) or itk.itkImagePython.itkImageVF33
         Returns:
@@ -769,60 +827,26 @@ class Augmentation_SMOD():
         # Unpack mean and PCA components from dimreduction()
         DVF_mean, DVF_Ud = DVFs_artificial_components
         
-        DVFs_artificial = []
-        for i in range(num_images):
-            DVF_artificial = np.zeros((DVF_mean[0].shape[0], 3))
-            for j in range(3):
-                x = np.random.normal(loc=0, scale=sigma, size=DVF_Ud[j].shape[0])
-                # Paper: vg = Vmean + U*x*d 
-                DVF_artificial[:,j] = DVF_mean[j] + np.dot(DVF_Ud[j].T, x)  #(3276800,1)
-            DVFs_artificial.append(np.reshape(DVF_artificial, (160, 128, 160, 3)))
+        DVF_artificial = np.zeros((DVF_mean[0].shape[0], 3))
+        for j in range(3):
+            x = np.random.normal(loc=0, scale=sigma, size=DVF_Ud[j].shape[0])
+            # Paper: vg = Vmean + U*x*d 
+            DVF_artificial[:,j] = DVF_mean[j] + np.dot(DVF_Ud[j].T, x)  #(3276800,1)
+        DVF_artificial=np.reshape(DVF_artificial, (160, 128, 160, 3))
 
-        return DVFs_artificial
+        if self.plot:
+            img_grid = np.zeros((160, 128, 160))
+            line_interval = 5  # Adjust this value to change the interval between lines
+            img_grid[:, ::line_interval, :] = 1
+            img_grid[:, :, ::line_interval] = 1
+            img_grid[::line_interval, :, :] = 1
+            self.transform(DVF_artificial, img_grid)
+            
+        return DVF_artificial
 
-    # IMG generation
-    def generate_artificial_imgs(self, imgs_to_atlas, DVFs_artificial_inverse, img_data="", breathing=False):
-        """Use DVFs and images registered to atlas to generate artificial images
-        Args:
-            imgs_to_atlas: images generated by registering them to atlas image
-            DVFs_artificial_inverse: itk or array type DVFs from generate_artificial_DVFs() function
-            img_data: original images, only used for visualization
-            plot: plots original, to-atlas and artificial image
-        """
-        imgs_artificial = []
-        counter=0
-        j=0
-        for i in range(len(imgs_to_atlas)):
-            if breathing==False:
-                for j in range(len(DVFs_artificial_inverse)):
-                    img_artificial = self.transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=imgs_to_atlas[i], plot=False)
-                    imgs_artificial.append(img_artificial)
-                    counter+=1
-                    print("Image {}/{} created".format(counter, len(imgs_to_atlas)*len(DVFs_artificial_inverse)))
-                    if self.plot:
-                        self.plot_registration(fixed_image=img_data[i], moving_image=imgs_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
-                                            name1="T00 original", name2="T00 to atlas", name3="artificial T00", name4="artificial DVF",
-                                            title="Creating artificial images", full=True)
-            else:
-                # When generating artificial T50a, we want 1 T50a for every T10a where there are n times more artificial DVFs
-                # Therefore dont also loop over DVFs
-                img_artificial = self.transform(DVF_itk=DVFs_artificial_inverse[j], img_moving=imgs_to_atlas[i], plot=False)
-                j+=1
-                if j==len(DVFs_artificial_inverse):
-                    j=0
-                imgs_artificial.append(img_artificial)
-                
-                counter+=1
-                
-                print("Image {}/{} created".format(counter, len(imgs_to_atlas)))
-                if self.plot:
-                    self.plot_registration(fixed_image=img_data[i], moving_image=imgs_to_atlas[i], result_image=img_artificial, deformation_field=DVFs_artificial_inverse[j],
-                                        name1="T00 original", name2="T00 to atlas", name3="artificial T00", name4="artificial DVF",
-                                        title="Creating artificial images", full=True)
-        return imgs_artificial 
 
     # MAIN functions  
-    def preprocessing_T00(self):
+    def preprocessing_inhaled(self):
         """Preprocessing of data augmentation which created the components for artificial DVFs and imgs_to_atlas
         Split from the data_augm_generation since these components only have to be made once which can be done as preprocessing step
         Function includes: (1) atlas generation, (2) registration to atlas, (3) calculate components for artificial DVFs
@@ -836,171 +860,73 @@ class Augmentation_SMOD():
         # (1) Generate or get atlas image
         print("Generating atlas image")
         if self.load_atlas==True:
-            img_atlas = self.generate_atlas(img_data=self.imgs_T00)
+            self.img_atlas = self.generate_atlas(img_data=self.imgs_inhaled)
         else:
             # Load already generated atlas image
             img_atlas = nib.load(self.root_data+'atlas/atlasv1.nii.gz')
             img_atlas = img_atlas.get_fdata()
-            img_atlas = itk.image_from_array(ndi.rotate((img_atlas).astype(np.float32),0)) # itk.itkImagePython.itkImageF3
-            plt.imshow(img_atlas[:,64,:])
+            self.img_atlas = itk.image_from_array(ndi.rotate((img_atlas).astype(np.float32),0)) # itk.itkImagePython.itkImageF3
+            if self.plot:
+                plt.imshow(img_atlas[:,64,:])
+                plt.title("Pregenerated atlas image")
 
         
         # (2) Register to atlas for DVFinverse and imgs_to_atlas  
-        print("Regestration of T00 images to atlas")  
-        DVFs, DVFs_inverse, imgs_to_atlas = self.register_to_atlas(img_atlas=img_atlas)
+        print("Regestration of inhaled images to atlas")  
+        DVFs, DVFs_inverse, imgs_to_atlas = self.register_to_atlas()
         
         # Optionally validate DVFs and DVFs_inverse (uncomment next line)
-        # self.validate_DVFs(DVFs, DVFs_inverse, img_moving=imgs_T00[0])
+        # self.validate_DVFs(DVFs, DVFs_inverse, img_moving=imgs_inhaled[0])
         
         # (3) Get components needed for artificial DVF generation
         print("Generating artificial DVF components")
-        DVF_T00_components = self.dimreduction(DVFs=DVFs_inverse)
+        DVF_inhaled_components = self.dimreduction(DVFs=DVFs_inverse)
         
-        return DVF_T00_components, imgs_to_atlas, DVFs
+        return DVF_inhaled_components, imgs_to_atlas, DVFs
 
-    def preprocessing_T50(self):
-        # register T00 to T50 with bspline to get the breathing motion
+    def preprocessing_exhaled(self):
+        # register inhaled to exhaled with bspline to get the breathing motion
         DVFs_breathing=[]
-        for i in range(len(self.imgs_T00)):
+        for i in range(len(self.imgs_inhaled)):
             result_image, DVF_breathing, result_transform_parameters = self.registration(
-                fixed_image=self.imgs_T50[i], moving_image=self.imgs_T00[i], 
+                fixed_image=self.imgs_exhaled[i], moving_image=self.imgs_inhaled[i], 
                 method="bspline")#, parameter_path=parameter_path_base+parameter_file)
             DVFs_breathing.append(DVF_breathing)
 
-        # generate artificial DVFs that model breathing motion from T00 to T50
+        # generate artificial DVFs that model breathing motion from inhaled to exhaled
         print("Generating artificial DVFs - breathing motion")
-        DVF_T50_components = self.dimreduction(DVFs=DVFs_breathing)
-        return DVF_T50_components
+        DVF_exhaled_components = self.dimreduction(DVFs=DVFs_breathing)
+        return DVF_exhaled_components
 
     # Phase generation
-    def generate_single_augmented_T00(self, img_T00):
-        """Generate artificial training data with on the spot
-        Contains random component sigma so imgs_artificial are never the same
-        Args:
-            DVF_T00_components: components necessary for DVF generation (DVF_mean, DVF_Ud) from dimreduction()
-            imgs_to_atlas (list with itk images): original training data registered to atlas
-            img_data: original training data (only needed) when plotting the generated images
-            sigma: random component in artificial DVF generation (500 gives noticable differences)
-            
-        """
-        # Generate artificial DVFs
-        print("Generating artificial DVFs")
-        DVF_artificial = self.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T00_components, 
-                                                num_images=1, sigma=self.sigma1)
-
-        if self.plot:
-            img_grid = np.zeros((160, 128, 160))
-            line_interval = 5  # Adjust this value to change the interval between lines
-            img_grid[:, ::line_interval, :] = 1
-            img_grid[:, :, ::line_interval] = 1
-            img_grid[::line_interval, :, :] = 1
-            for i in range(len(DVF_artificial)):
-                self.transform(DVF_artificial[i], img_grid)
-        
-        # generate artificial images
-        print("Generating artificial images")
-        img_artificial_T00 = self.generate_artificial_imgs(imgs_to_atlas=img_T00, DVFs_artificial_inverse=DVF_artificial)
-
-        return img_artificial_T00
-
-    def generate_single_augmented_T50(self, img_T00a):
-        DVF_artificial_breathing = self.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T50_components, 
-                                                num_images=1, sigma=self.sigma2)
-        
-        if self.plot: #plot dvf on grid
-            img_grid = np.zeros((160, 128, 160))
-            line_interval = 5  # Adjust this value to change the interval between lines
-            img_grid[:, ::line_interval, :] = 1
-            img_grid[:, :, ::line_interval] = 1
-            img_grid[::line_interval, :, :] = 1
-            for i in range(len(DVF_artificial_breathing)):
-                self.transform(DVF_artificial_breathing[i], img_grid)
-
-        # apply artificial breathing motion to T00a
-        img_artificial_T50 = self.generate_artificial_imgs(imgs_to_atlas=img_T00a, DVFs_artificial_inverse=DVF_artificial_breathing, plot=False, breathing=True)
-        return img_artificial_T50
-
-    def generate_augmented_T00(self, img_data=None):
-        """Generate artificial training data with on the spot
-        Contains random component sigma so imgs_artificial are never the same
-        Args:
-            DVF_T00_components: components necessary for DVF generation (DVF_mean, DVF_Ud) from dimreduction()
-            imgs_to_atlas (list with itk images): original training data registered to atlas
-            img_data: original training data (only needed) when plotting the generated images
-            sigma: random component in artificial DVF generation (500 gives noticable differences)
-            
-        """
-        # Generate artificial DVFs
-        print("Generating artificial DVFs")
-        DVFs_artificial = self.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T00_components, 
-                                                num_images=self.num_images, sigma=self.sigma1)
-
-        if self.plot:
-            img_grid = np.zeros((160, 128, 160))
-            line_interval = 5  # Adjust this value to change the interval between lines
-            img_grid[:, ::line_interval, :] = 1
-            img_grid[:, :, ::line_interval] = 1
-            img_grid[::line_interval, :, :] = 1
-            for i in range(len(DVFs_artificial)):
-                self.transform(DVFs_artificial[i], img_grid)
-        
-        # generate artificial images
-        print("Generating artificial images")
-        imgs_artificial_T00 = self.generate_artificial_imgs(imgs_to_atlas=self.imgs_to_atlas, DVFs_artificial_inverse=DVFs_artificial, img_data=img_data, plot=False)
-
-        return imgs_artificial_T00
+    def generate_img_artificial(self, img_base, DVF_components, sigma, breathing=False):
+        print("Generating artificial DVF")
+        DVF_artificial = self.generate_artificial_DVFs(DVFs_artificial_components=DVF_components, 
+                                                       sigma=sigma)
     
-    def generate_augmented_T50(self, imgs_T00a):
-        DVFs_artificial_breathing = self.generate_artificial_DVFs(DVFs_artificial_components=self.DVF_T50_components, 
-                                                num_images=self.num_images, sigma=self.sigma2)
+        # generate artificial images
+        print("Generating artificial image")
+        img_artificial = self.transform(img_moving=img_base, DVF_itk=DVF_artificial)
         
-        if self.plot: #plot dvf on grid
-            img_grid = np.zeros((160, 128, 160))
-            line_interval = 5  # Adjust this value to change the interval between lines
-            img_grid[:, ::line_interval, :] = 1
-            img_grid[:, :, ::line_interval] = 1
-            img_grid[::line_interval, :, :] = 1
-            for i in range(len(DVFs_artificial_breathing)):
-                self.transform(DVFs_artificial_breathing[i], img_grid)
+        # if self.plot:
+        #     if breathing==False:
+        #         self.plot_registration(fixed_image=self.imgs_inhaled, moving_image=img_base, result_image=img_artificial, deformation_field=DVF_artificial,
+        #                             name1="Original inhaled", name2="Inhaled to atlas", name3="Artificial inhaled", name4="artificial DVF",
+        #                             title="Creating artificial images", full=True)
+        #     elif breathing==True:
+        #         self.plot_registration(fixed_image=self.imgs_exhaled, moving_image=img_base, result_image=img_artificial, deformation_field=DVF_artificial,
+        #                             name1="Original exhaled", name2="Artificial inhaled", name3="Artificial exhaled", name4="artificial DVF",
+        #                             title="Creating artificial images", full=True)
 
-        # apply artificial breathing motion to T00a
-        imgs_artificial_T50 = self.generate_artificial_imgs(imgs_to_atlas=imgs_T00a, DVFs_artificial_inverse=DVFs_artificial_breathing, plot=False, breathing=True)
-        return imgs_artificial_T50
+        return img_artificial
 
-    # Plotting and writing final data
-    def plot_data_augm(imgs_artificial, imgs_original, num_images, title, neg=False):
-        num_rows = (len(imgs_artificial) + 2) // num_images        
-        fig, axes = plt.subplots(num_rows, num_images+1, figsize=(num_images*3, num_rows*2.5))        
+    def plot_data_augmpairs(img_artificial_inhaled, img_artificial_exhaled, title):
+        fig, axes = plt.subplots(len(img_artificial_inhaled), 3, figsize=(3*2.5, len(img_artificial_inhaled)*3))        
         fig.suptitle(title, y=1)  
-        i_original=0
-        i_artificial=0  
-        for i, ax in enumerate(axes.flatten()):
-            if i%(num_images+1)==0:
-                ax.imshow(imgs_original[i_original][:,64,:])
-                ax.axis('off')
-                ax.set_title("Original image", fontsize=15)
-                i_original+=1
-            elif neg==False:
-                ax.imshow(imgs_artificial[i_artificial][:,64,:])
-                ax.axis('off')
-                ax.set_title("Artificial image", fontsize=15)
-                i_artificial+=1  
-            elif neg==True:
-                imgs=(imgs_artificial[i_artificial]) - np.asarray(imgs_original[i_original-1])
-                ax.imshow(imgs[:,64,:])
-                ax.axis('off')
-                ax.set_title("Artificial - original", fontsize=13)
-                i_artificial+=1    
-        plt.tight_layout()    
-        plt.plot()
-
-    def plot_data_augmpairs(imgs_artificial_1, imgs_artificial_2, title):
-        fig, axes = plt.subplots(len(imgs_artificial_1), 3, figsize=(3*2.5, len(imgs_artificial_1)*3))        
-        fig.suptitle(title, y=1)  
-        for i in range(len(imgs_artificial_1)):
-            axes[i,0].imshow(imgs_artificial_1[i][:,64,:])
-            axes[i,1].imshow(imgs_artificial_2[i][:,64,:])
-            img_neg=np.asarray(imgs_artificial_2[i]) - np.asarray(imgs_artificial_1[i])
+        for i in range(len(img_artificial_inhaled)):
+            axes[i,0].imshow(img_artificial_inhaled[i][:,64,:])
+            axes[i,1].imshow(img_artificial_exhaled[i][:,64,:])
+            img_neg=np.asarray(img_artificial_exhaled[i]) - np.asarray(img_artificial_inhaled[i])
             axes[i,2].imshow(img_neg[:,64,:])
             axes[i,0].axis('off')
             axes[i,1].axis('off')
@@ -1008,74 +934,85 @@ class Augmentation_SMOD():
         plt.tight_layout()    
         plt.plot()
 
-    def write_augmented_data(path, foldername, imgs_T00a, imgs_T50a):
-        img = nib.load(path+'train/image/case_001/T00.nii.gz')
-        for i in range(len(imgs_T00a)):
-            folder_path = os.path.join(path,foldername,"image", str(i).zfill(3))
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
+    # def write_augmented_data(path, foldername, imgs_inhaled, imgs_exhaled):
+    #     img = nib.load(path+'train/image/case_001/T00.nii.gz')
+    #     for i in range(len(imgs_inhaled)):
+    #         folder_path = os.path.join(path,foldername,"image", str(i).zfill(3))
+    #         if not os.path.exists(folder_path):
+    #             os.makedirs(folder_path)
                 
-            img_nib = nib.Nifti1Image(imgs_T00a[i], img.affine)
-            nib.save(img_nib, os.path.join(folder_path, 'T00.nii.gz'))
-            img_nib = nib.Nifti1Image(imgs_T50a[i], img.affine)
-            nib.save(img_nib, os.path.join(folder_path, 'T50.nii.gz'))
+    #         img_nib = nib.Nifti1Image(imgs_inhaled[i], img.affine)
+    #         nib.save(img_nib, os.path.join(folder_path, 'T00.nii.gz'))
+    #         img_nib = nib.Nifti1Image(imgs_exhaled[i], img.affine)
+    #         nib.save(img_nib, os.path.join(folder_path, 'T50.nii.gz'))
     
 
 
 if __name__ == '__main__':
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
 
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--seed_value', type=int, default=1000)
-    # parser.add_argument('--dataroot', type=str, default=root_data)
-    # parser.add_argument('--augment_type', type=str, default='GrydsPhysicsInformed',
-    #                     help="should be GrydsPhysicsInformed")
-    # parser.add_argument('--phase', type=str, default='train', help='train, val, test')
-    # parser.add_argument('-dev', '--device', type=str, metavar='', default='cuda:0', help='device / gpu used')
-    # args = parser.parse_args()
-    # set_seed(args.seed_value)
 
     # example of original dataset without augmentation_gryds
     dataset_original = DatasetLung(train_val_test='train', version='',
                                    root_data=root_data, augmenter=None, phases='in_ex')
-    moving, fixed = dataset_original[0]
+    fixed, moving = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_original])
     print("Lentgh of original dataset: ", len(dataset_original))
     fig, axs = plt.subplots(1, 2)
-    axs[0].imshow(moving[0,:,64,:], cmap='gray')
+    axs[0].imshow(moving[0][0,:,64,:], cmap='gray')
     axs[0].set_title('moving')
-    axs[1].imshow(fixed[0,:,64,:], cmap='gray')
+    axs[1].imshow(fixed[0][0,:,64,:], cmap='gray')
     axs[1].set_title('fixed')
     fig.show()
 
-    # # example of synthetic data (augmented)
-        
-    augmenter_SMOD = Augmentation_SMOD(root_data=root_data, 
-                                       simga1=15000, simga2=1500, num_images=1, 
-                                       plot=True, load_atlas=False)
-    dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-                                    augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
-    
-    
-    # # augmenter_gryds = Augmentation_gryds(args)
-    # dataset_synthetic = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-    #                                 augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
-    
-    
-    moving_synth, fixed_synth = dataset_synthetic_SMOD[0]
-    for i in range(len(dataset_synthetic_SMOD)):
-        moving_synth, fixed_synth = dataset_synthetic_SMOD[i]
-        moving_synth = moving_synth.to("cpu")
-        fixed_synth = fixed_synth.to("cpu")
 
-        fig, axs = plt.subplots(2, 2)
-        axs[0,0].imshow(moving[0,:,64,:], cmap='gray')
-        axs[0,0].set_title('moving')
-        axs[0, 1].imshow(fixed[0,:,64,:], cmap='gray')
-        axs[0, 1].set_title('fixed')
-        axs[1, 0].imshow(moving_synth[0,:,64,:], cmap='gray')
-        axs[1, 0].set_title('moving_synth')
-        axs[1, 1].imshow(fixed_synth[0,:,64,:], cmap='gray')
-        axs[1, 1].set_title('fixed_synth')
+    augmentation="gryds" # or "gryds"
+    if augmentation=="SMOD":
+        # example of synthetic data with SMOD
+        #TODO: add non varying data 
+        augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
+                                        sigma1=15000, sigma2=1500, num_images=1, 
+                                        plot=True, load_atlas=False)
+        dataset_synthetic = DatasetLung(train_val_test='train', version='', root_data=root_data, 
+                                        augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
+    
+    elif augmentation == "gryds":
+        # parser = argparse.ArgumentParser()
+        # parser.add_argument('--seed_value', type=int, default=1000)
+        # parser.add_argument('--dataroot', type=str, default=root_data)
+        # parser.add_argument('--augment_type', type=str, default='GrydsPhysicsInformed',
+        #                     help="should be GrydsPhysicsInformed")
+        # parser.add_argument('--phase', type=str, default='train', help='train, val, test')
+        # parser.add_argument('-dev', '--device', type=str, metavar='', default='cuda:0', help='device / gpu used')
+        # args = parser.parse_args()
+        # set_seed(args.seed_value)
+        
+        augmenter_gryds = Augmentation_gryds()
+        dataset_synthetic = DatasetLung(train_val_test='train', version='', root_data=root_data, 
+                                        augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
+ 
+    
+    inhaled, exhaled = zip(*[(img_inhaled[0], img_exhaled[0]) for img_inhaled, img_exhaled in dataset_original])
+    for i in range(len(dataset_synthetic)):
+        if augmentation=="SMOD":
+            inhaled_synth, exhaled_synth = dataset_synthetic[i]
+        elif augmentation=="gryds":
+            inhaled_synth, exhaled_synth = dataset_synthetic[i]
+            inhaled_synth = np.asarray(inhaled_synth.to("cpu"))[0]
+            exhaled_synth = np.asarray(exhaled_synth.to("cpu"))[0]
+
+        fig, axs = plt.subplots(2, 3)
+        axs[0,0].imshow(np.asarray(inhaled[i])[:,64,:], cmap='gray')
+        axs[0,0].set_title('inhaled')
+        axs[0, 1].imshow(np.asarray(exhaled[i])[:,64,:], cmap='gray')
+        axs[0, 1].set_title('exhaled')
+        axs[0, 2].imshow((np.asarray(inhaled[i])-np.asarray(exhaled[i]))[:,64,:], cmap='gray')
+        axs[0, 2].set_title('inhaled-exhaled')
+        axs[1, 0].imshow(inhaled_synth[:,64,:], cmap='gray')
+        axs[1, 0].set_title('inhaled_synth')
+        axs[1, 1].imshow(exhaled_synth[:,64,:], cmap='gray')
+        axs[1, 1].set_title('exhaled_synth')
+        axs[1, 2].imshow((inhaled_synth-exhaled_synth)[:,64,:], cmap='gray')
+        axs[1, 2].set_title('inhaled_synth - exhaled_synth')
         fig.show()
 
 
