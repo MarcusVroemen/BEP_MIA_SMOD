@@ -990,6 +990,7 @@ class Augmentation_SMOD():
 
 if __name__ == '__main__':
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
+    root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
 
     # Original data
     dataset_original = DatasetLung(train_val_test='train', version='',
