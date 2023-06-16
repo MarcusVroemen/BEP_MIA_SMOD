@@ -1011,30 +1011,29 @@ if __name__ == '__main__':
                                     augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
     imgs_inhaled_SMOD, imgs_exhaled_SMOD = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_synthetic_SMOD])
     
-    # plot
-    for i in range(len(dataset_original)):
 
-        fig, axs = plt.subplots(3, 3, figsize=(17,17))
+    for i in range(len(dataset_original)):
+        fig, axs = plt.subplots(3, 3, figsize=(20,20))
         axs[0,0].imshow(np.asarray(imgs_inhaled[i][0])[:,64,:], cmap='gray')
-        axs[0,0].set_title('inhaled')
+        axs[0,0].set_title('inhaled', fontsize=40)
         axs[0, 1].imshow(np.asarray(imgs_exhaled[i][0])[:,64,:], cmap='gray')
-        axs[0, 1].set_title('exhaled')
+        axs[0, 1].set_title('exhaled', fontsize=40)
         axs[0, 2].imshow((np.asarray(imgs_inhaled[i][0])-np.asarray(imgs_exhaled[i][0]))[:,64,:], cmap='gray')
-        axs[0, 2].set_title('inhales-exhaled')
+        axs[0, 2].set_title('inhales-exhaled', fontsize=40)
         
         axs[1, 0].imshow(np.asarray(imgs_inhaled_gryds[i][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[1, 0].set_title('inhaled_gryds')
+        axs[1, 0].set_title('inhaled gryds', fontsize=40)
         axs[1, 1].imshow(np.asarray(imgs_exhaled_gryds[i][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[1, 1].set_title('exhaled_gryds')
+        axs[1, 1].set_title('exhaled gryds', fontsize=40)
         axs[1, 2].imshow((np.asarray(imgs_inhaled_gryds[i][0].to("cpu")) - np.asarray(imgs_exhaled_gryds[i][0].to("cpu")))[:,64,:], cmap='gray')
-        axs[1, 2].set_title('inhales-exhaled gryds')
+        axs[1, 2].set_title('inhaled-exhaled gryds', fontsize=40)
         
-        axs[2, 0].imshow(imgs_inhaled_SMOD[i][:,64,:], cmap='gray')
-        axs[2, 0].set_title('inhaled_SMOD')
-        axs[2, 1].imshow(imgs_exhaled_SMOD[i][:,64,:], cmap='gray')
-        axs[2, 1].set_title('exhaled_SMOD')
-        axs[2, 2].imshow((imgs_inhaled_SMOD[i] - imgs_exhaled_SMOD[i])[:,64,:], cmap='gray')
-        axs[2, 2].set_title('inhales-exhaled SMOD')
+        axs[2, 0].imshow(np.asarray(imgs_inhaled_SMOD[i][0].to("cpu"))[:,64,:], cmap='gray')
+        axs[2, 0].set_title('inhaled SMOD', fontsize=40)
+        axs[2, 1].imshow(np.asarray(imgs_exhaled_SMOD[i][0].to("cpu"))[:,64,:], cmap='gray')
+        axs[2, 1].set_title('exhaled SMOD', fontsize=40)
+        axs[2, 2].imshow((np.asarray(imgs_inhaled_SMOD[i][0].to("cpu") - np.asarray(imgs_exhaled_SMOD[i][0].to("cpu"))))[:,64,:], cmap='gray')
+        axs[2, 2].set_title('inhales-exhaled SMOD', fontsize=40)
         for ax in axs.flatten():
             ax.set_axis_off()
         plt.tight_layout()
