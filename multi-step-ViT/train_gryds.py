@@ -113,7 +113,7 @@ if __name__ == "__main__":
     run["dataset/size"] = len(train_dataset)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
-
+    
     """ INITIALIZE MODEL """
     model = init_model(args, img_size=train_dataset.inshape)
     run["model/trainable_params"] = sum(p.numel() for p in model.parameters() if p.requires_grad)

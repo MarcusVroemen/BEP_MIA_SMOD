@@ -223,6 +223,10 @@ class Dataset(torch.utils.data.Dataset):
             if self.plot:
                 self.augmenter.plot_data_augmpairs(img_artificial_inhaled, img_artificial_exhaled, title="Artificial inhaled and exhaled images")
             
+            # change 3d np.arrays to 4d torch
+            img_artificial_inhaled = torch.from_numpy(img_artificial_inhaled).unsqueeze(0)
+            img_artificial_exhaled = torch.from_numpy(img_artificial_exhaled).unsqueeze(0)
+            
             return img_artificial_inhaled, img_artificial_exhaled
             
         else:
@@ -242,7 +246,7 @@ class DatasetLung(Dataset):
         self.img_folder = f'{root_data}/{train_val_test}/image/***'
         self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
         self.init_paths()
-        self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
+        # self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
 
     def init_paths(self):
         if self.phases == 'in_ex':
@@ -296,25 +300,25 @@ class DatasetLung(Dataset):
         phase_f = int(fixed_path[-9:-7])
         return case_m, case_f, phase_m, phase_f
 
-    def get_landmarks(self, i):
-        fixed_landmarks = read_pts(self.fixed_pts[i]) + torch.tensor(self.offsets)
-        moving_landmarks = read_pts(self.moving_pts[i]) + torch.tensor(self.offsets)
+    # def get_landmarks(self, i):
+    #     fixed_landmarks = read_pts(self.fixed_pts[i]) + torch.tensor(self.offsets)
+    #     moving_landmarks = read_pts(self.moving_pts[i]) + torch.tensor(self.offsets)
 
-        indices_all = []
-        for pts in [fixed_landmarks, moving_landmarks]:
-            indices_all = indices_all + np.argwhere(pts[:, 0] >= self.inshape[0]).tolist()[0]
-            indices_all = indices_all + np.argwhere(pts[:, 1] >= self.inshape[1]).tolist()[0]
-            indices_all = indices_all + np.argwhere(pts[:, 2] >= self.inshape[2]).tolist()[0]
-            indices_all = indices_all + np.argwhere(pts[:, 0] < 0).tolist()[0]
-            indices_all = indices_all + np.argwhere(pts[:, 1] < 0).tolist()[0]
-            indices_all = indices_all + np.argwhere(pts[:, 2] < 0).tolist()[0]
+    #     indices_all = []
+    #     for pts in [fixed_landmarks, moving_landmarks]:
+    #         indices_all = indices_all + np.argwhere(pts[:, 0] >= self.inshape[0]).tolist()[0]
+    #         indices_all = indices_all + np.argwhere(pts[:, 1] >= self.inshape[1]).tolist()[0]
+    #         indices_all = indices_all + np.argwhere(pts[:, 2] >= self.inshape[2]).tolist()[0]
+    #         indices_all = indices_all + np.argwhere(pts[:, 0] < 0).tolist()[0]
+    #         indices_all = indices_all + np.argwhere(pts[:, 1] < 0).tolist()[0]
+    #         indices_all = indices_all + np.argwhere(pts[:, 2] < 0).tolist()[0]
 
-        indices_all = np.unique(indices_all)
+    #     indices_all = np.unique(indices_all)
 
-        if len(indices_all) > 0:
-            fixed_landmarks = np.delete(fixed_landmarks, indices_all, axis=0)
-            moving_landmarks = np.delete(moving_landmarks, indices_all, axis=0)
-        return moving_landmarks, fixed_landmarks
+    #     if len(indices_all) > 0:
+    #         fixed_landmarks = np.delete(fixed_landmarks, indices_all, axis=0)
+    #         moving_landmarks = np.delete(moving_landmarks, indices_all, axis=0)
+    #     return moving_landmarks, fixed_landmarks
 
     def overfit_one(self, i):
         self.overfit = True
@@ -725,7 +729,8 @@ class Augmentation_SMOD():
             A_new_array = sum(np.asarray(re_registered_set)) / len(np.asarray(re_registered_set)) 
             A_new = itk.image_from_array(A_new_array.astype(np.float32))
             
-            self.plot_registration(An, A_new, np.asarray(An) - np.asarray(A_new), deformation_field, full=False)
+            if self.plot:
+                self.plot_registration(An, A_new, np.asarray(An) - np.asarray(A_new), deformation_field, full=False)
             
             iteration += 1
 
@@ -951,68 +956,53 @@ class Augmentation_SMOD():
 if __name__ == '__main__':
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
 
-
-    # example of original dataset without augmentation_gryds
+    # Original data
     dataset_original = DatasetLung(train_val_test='train', version='',
                                    root_data=root_data, augmenter=None, phases='in_ex')
-    fixed, moving = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_original])
-    print("Lentgh of original dataset: ", len(dataset_original))
-    fig, axs = plt.subplots(1, 2)
-    axs[0].imshow(moving[0][0,:,64,:], cmap='gray')
-    axs[0].set_title('moving')
-    axs[1].imshow(fixed[0][0,:,64,:], cmap='gray')
-    axs[1].set_title('fixed')
-    fig.show()
+    imgs_inhaled, imgs_exhaled = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_original])
 
-
-    # augmentation="gryds" # or "gryds"
-    # if augmentation=="SMOD":
-        # example of synthetic data with SMOD
-        #TODO: add non varying data 
-    augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
-                                    sigma1=15000, sigma2=1500, num_images=1, 
-                                    plot=True, load_atlas=False)
-    dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-                                    augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
-    
-    # elif augmentation == "gryds":
+    #TODO: add non varying data 
+    #TODO: output SMOD zelfde als gryds (tensor op cuda)
+    # Gryds
     augmenter_gryds = Augmentation_gryds()
     dataset_synthetic_gryds = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-                                    augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
- 
+                                    augmenter=augmenter_gryds, augment="gryds", save_augmented=False, phases='in_ex')
+    imgs_inhaled_gryds, imgs_exhaled_gryds = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_synthetic_gryds])
+
+    # SMOD
+    augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
+                                    sigma1=15000, sigma2=1500, num_images=1, 
+                                    plot=False, load_atlas=True)
+    dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
+                                    augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
+    imgs_inhaled_SMOD, imgs_exhaled_SMOD = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_synthetic_SMOD])
     
-    inhaled, exhaled = zip(*[(img_inhaled[0], img_exhaled[0]) for img_inhaled, img_exhaled in dataset_original])
-    # for i in range(len(dataset_synthetic_SMOD)):
-    for i in range(2):
-        # if augmentation=="SMOD":
-        inhaled_synth_SMOD, exhaled_synth_SMOD = dataset_synthetic_SMOD[i]
-        # elif augmentation=="gryds":
-        inhaled_synth_gryds, exhaled_synth_gryds = dataset_synthetic_gryds[i]
-        inhaled_synth_gryds = np.asarray(inhaled_synth_gryds.to("cpu"))[0]
-        exhaled_synth_gryds = np.asarray(exhaled_synth_gryds.to("cpu"))[0]
+    # plot
+    for i in range(len(dataset_original)):
 
         fig, axs = plt.subplots(3, 3, figsize=(17,17))
-        axs[0,0].imshow(np.asarray(inhaled[i])[:,64,:], cmap='gray')
+        axs[0,0].imshow(np.asarray(imgs_inhaled[i][0])[:,64,:], cmap='gray')
         axs[0,0].set_title('inhaled')
-        axs[0, 1].imshow(np.asarray(exhaled[i])[:,64,:], cmap='gray')
+        axs[0, 1].imshow(np.asarray(imgs_exhaled[i][0])[:,64,:], cmap='gray')
         axs[0, 1].set_title('exhaled')
-        axs[0, 2].imshow((np.asarray(inhaled[i])-np.asarray(exhaled[i]))[:,64,:], cmap='gray')
-        axs[0, 2].set_title('in - ex')
-        axs[1, 0].imshow(inhaled_synth_gryds[:,64,:], cmap='gray')
-        axs[1, 0].set_title('inhaled_synth_gryds')
-        axs[1, 1].imshow(exhaled_synth_gryds[:,64,:], cmap='gray')
-        axs[1, 1].set_title('exhaled_synth_gryds')
-        axs[1, 2].imshow((inhaled_synth_gryds-exhaled_synth_gryds)[:,64,:], cmap='gray')
-        axs[1, 2].set_title('in - ex gryds')
-        axs[2, 0].imshow(inhaled_synth_SMOD[:,64,:], cmap='gray')
-        axs[2, 0].set_title('inhaled_synth_SMOD')
-        axs[2, 1].imshow(exhaled_synth_SMOD[:,64,:], cmap='gray')
-        axs[2, 1].set_title('exhaled_synth_SMOD')
-        axs[2, 2].imshow((inhaled_synth_SMOD-exhaled_synth_SMOD)[:,64,:], cmap='gray')
-        axs[2, 2].set_title('in - ex SMOD')
+        axs[0, 2].imshow((np.asarray(imgs_inhaled[i][0])-np.asarray(imgs_exhaled[i][0]))[:,64,:], cmap='gray')
+        axs[0, 2].set_title('inhales-exhaled')
+        
+        axs[1, 0].imshow(np.asarray(imgs_inhaled_gryds[i][0].to("cpu"))[:,64,:], cmap='gray')
+        axs[1, 0].set_title('inhaled_gryds')
+        axs[1, 1].imshow(np.asarray(imgs_exhaled_gryds[i][0].to("cpu"))[:,64,:], cmap='gray')
+        axs[1, 1].set_title('exhaled_gryds')
+        axs[1, 2].imshow((np.asarray(imgs_inhaled_gryds[i][0].to("cpu")) - np.asarray(imgs_exhaled_gryds[i][0].to("cpu")))[:,64,:], cmap='gray')
+        axs[1, 2].set_title('inhales-exhaled gryds')
+        
+        axs[2, 0].imshow(imgs_inhaled_SMOD[i][:,64,:], cmap='gray')
+        axs[2, 0].set_title('inhaled_SMOD')
+        axs[2, 1].imshow(imgs_exhaled_SMOD[i][:,64,:], cmap='gray')
+        axs[2, 1].set_title('exhaled_SMOD')
+        axs[2, 2].imshow((imgs_inhaled_SMOD[i] - imgs_exhaled_SMOD[i])[:,64,:], cmap='gray')
+        axs[2, 2].set_title('inhales-exhaled SMOD')
         for ax in axs.flatten():
             ax.set_axis_off()
         plt.tight_layout()
         fig.show()
-
 
