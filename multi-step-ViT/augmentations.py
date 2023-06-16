@@ -245,7 +245,8 @@ class DatasetLung(Dataset):
         self.img_folder = f'{root_data}/{train_val_test}/image/***'
         self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
         self.init_paths()
-        # self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
+        self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
+        # self.inshape = np.array((160,128,160))
 
     def init_paths(self):
         if self.phases == 'in_ex':
@@ -299,25 +300,25 @@ class DatasetLung(Dataset):
         phase_f = int(fixed_path[-9:-7])
         return case_m, case_f, phase_m, phase_f
 
-    # def get_landmarks(self, i):
-    #     fixed_landmarks = read_pts(self.fixed_pts[i]) + torch.tensor(self.offsets)
-    #     moving_landmarks = read_pts(self.moving_pts[i]) + torch.tensor(self.offsets)
+    def get_landmarks(self, i):
+        fixed_landmarks = read_pts(self.fixed_pts[i]) + torch.tensor(self.offsets)
+        moving_landmarks = read_pts(self.moving_pts[i]) + torch.tensor(self.offsets)
 
-    #     indices_all = []
-    #     for pts in [fixed_landmarks, moving_landmarks]:
-    #         indices_all = indices_all + np.argwhere(pts[:, 0] >= self.inshape[0]).tolist()[0]
-    #         indices_all = indices_all + np.argwhere(pts[:, 1] >= self.inshape[1]).tolist()[0]
-    #         indices_all = indices_all + np.argwhere(pts[:, 2] >= self.inshape[2]).tolist()[0]
-    #         indices_all = indices_all + np.argwhere(pts[:, 0] < 0).tolist()[0]
-    #         indices_all = indices_all + np.argwhere(pts[:, 1] < 0).tolist()[0]
-    #         indices_all = indices_all + np.argwhere(pts[:, 2] < 0).tolist()[0]
+        indices_all = []
+        for pts in [fixed_landmarks, moving_landmarks]:
+            indices_all = indices_all + np.argwhere(pts[:, 0] >= self.inshape[0]).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 1] >= self.inshape[1]).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 2] >= self.inshape[2]).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 0] < 0).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 1] < 0).tolist()[0]
+            indices_all = indices_all + np.argwhere(pts[:, 2] < 0).tolist()[0]
 
-    #     indices_all = np.unique(indices_all)
+        indices_all = np.unique(indices_all)
 
-    #     if len(indices_all) > 0:
-    #         fixed_landmarks = np.delete(fixed_landmarks, indices_all, axis=0)
-    #         moving_landmarks = np.delete(moving_landmarks, indices_all, axis=0)
-    #     return moving_landmarks, fixed_landmarks
+        if len(indices_all) > 0:
+            fixed_landmarks = np.delete(fixed_landmarks, indices_all, axis=0)
+            moving_landmarks = np.delete(moving_landmarks, indices_all, axis=0)
+        return moving_landmarks, fixed_landmarks
 
     def overfit_one(self, i):
         self.overfit = True

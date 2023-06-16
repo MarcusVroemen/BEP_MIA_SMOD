@@ -21,9 +21,9 @@ torch.backends.cudnn.benchmark = True  # speed ups
 # os.environ["PYDEVD_WARN_EVALUATION_TIMEOUT"] = "100"
 # print(os.environ.get("PYDEVD_WARN_EVALUATION_TIMEOUT"))
 
-base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
+# base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
 # base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
-# base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
+base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
 
 
 """ ARGUMENT PARSER """
@@ -63,10 +63,9 @@ parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', h
 parser.add_argument('-v', '--version', type=str, metavar='', default='', help='preprocessing version')
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
 #* Data augmentation 
-parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
+# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
 # parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
-augmentation_mode="none"
 
 args = parser.parse_args()
 print(vars(args))
@@ -84,11 +83,12 @@ if __name__ == "__main__":
             print("Init regular training data: ", len(train_dataset))
             
         elif args.augmentation == 'SMOD':
-            dataset_original = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, augmenter=None, phases='in_ex')
+            # dataset_original = DatasetLung(train_val_test='train', version='', root_data=args.root_data, augmenter=None, phases='in_ex')
+            dataset_original = DatasetLung('train', root_data=args.root_data, version=args.version)
             augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
                                             sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
                                             load_preprocessing=True, save_preprocessing=False)
-            train_dataset = DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
+            train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
                                             augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
             print("Init SMOD training data: ", len(train_dataset))
             
