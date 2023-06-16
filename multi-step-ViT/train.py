@@ -75,34 +75,30 @@ set_seed(args.random_seed)
 if __name__ == "__main__":
     """ CONFIG NEPTUNE """
     args.mode = 'train'
-    # If you uncomment the code below and make an account on Neptune you can monitor the progress of your training
-    # Also uncomment the lines starting with "run"  --> for example line 75 "run["dataset/size"] = len(train_dataset)" to actually log something to neptune
     run, args, epoch = init_neptune(args)
-    # run = None # comment this line and the line below if you uncommented the lines above
-    # epoch = 0
 
     """ CONFIG DATASET """
     if args.dataset == 'lung':
         if args.augmentation == 'none':
             train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
+            print("Init regular training data: ", len(train_dataset))
             
         elif args.augmentation == 'SMOD':
             dataset_original = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, augmenter=None, phases='in_ex')
             augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
-                                        sigma1=15000, sigma2=1500, num_images=1, 
-                                        plot=False, load_atlas=True)
+                                            sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
+                                            load_preprocessing=True, save_preprocessing=False)
             train_dataset = DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
-                                        augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
-            
+                                            augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
+            print("Init SMOD training data: ", len(train_dataset))
             
         elif args.augmentation == 'gryds':
             augmenter_gryds = AUG.Augmentation_gryds(args)
             train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
                                         augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
+            print("Init gryds* training data: ", len(train_dataset))
             
     val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
-
-    print("Training dataset size: ", len(train_dataset))
     
     train_dataset.adjust_shape(multiple_of=32)
     val_dataset.adjust_shape(multiple_of=32)
