@@ -54,7 +54,7 @@ parser.add_argument('-loss', '--similarity_loss', type=str, metavar='', default=
                     help='similarity loss | nmi | ncc ')
 parser.add_argument('-lr', '--learning_rate', type=float, metavar='', default=1e-4, help='learning rate')
 parser.add_argument("-rw", '--reg_weight', type=float, metavar='', default=0.5, help='regularization (smoothing) weight')
-parser.add_argument('-ep', '--epochs', type=int, metavar='', default=5, help='nr of epochs you want to train on')
+parser.add_argument('-ep', '--epochs', type=int, metavar='', default=50, help='nr of epochs you want to train on')
 parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
                     help='batch size you want to use during training')
 
@@ -62,17 +62,40 @@ parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
 parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', help='dataset')
 parser.add_argument('-v', '--version', type=str, metavar='', default='', help='preprocessing version')
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
-#* Data augmentation 
+# Data augmentation 
 parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
-augmentation_mode="none"
 
 args = parser.parse_args()
 print(vars(args))
 set_seed(args.random_seed)
 
 if __name__ == "__main__":
+
+    """ CONFIG DATASET """
+    if args.dataset == 'lung':
+        if args.augmentation == 'none':
+            train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
+            print(f"\nOriginal data initialized. dataset size={len(train_dataset)}\n")
+            
+        elif args.augmentation == 'SMOD':
+            print("\nInitializin SMOD\n")
+            dataset_original = AUG.DatasetLung(train_val_test='train', version=args.version, root_data=args.root_data, augmenter=None)
+            augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
+                                        sigma1=15000, sigma2=1500, num_images=1, 
+                                        plot=False, load_atlas=True)
+            train_dataset = DatasetLung(train_val_test='train', version=args.version, root_data=args.root_data, 
+                                        augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False)
+            print(f"\nSMOD initialized. dataset size={len(train_dataset)}\n")
+        elif args.augmentation == 'gryds':
+            augmenter_gryds = AUG.Augmentation_gryds(args)
+            train_dataset = AUG.DatasetLung(train_val_test='train', version=args.version, root_data=args.root_data, 
+                                        augmenter=augmenter_gryds, augment="gryds", save_augmented=False)
+            print(f"\nGryds* initialized. dataset size={len(train_dataset)}\n")
+    val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+    
+    train_dataset.adjust_shape(multiple_of=32)
+    val_dataset.adjust_shape(multiple_of=32)
+    
     """ CONFIG NEPTUNE """
     args.mode = 'train'
     # If you uncomment the code below and make an account on Neptune you can monitor the progress of your training
@@ -80,32 +103,7 @@ if __name__ == "__main__":
     run, args, epoch = init_neptune(args)
     # run = None # comment this line and the line below if you uncommented the lines above
     # epoch = 0
-
-    """ CONFIG DATASET """
-    if args.dataset == 'lung':
-        if args.augmentation == 'none':
-            train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
-            
-        elif args.augmentation == 'SMOD':
-            dataset_original = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, augmenter=None, phases='in_ex')
-            augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
-                                        sigma1=15000, sigma2=1500, num_images=1, 
-                                        plot=False, load_atlas=True)
-            train_dataset = DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
-                                        augmenter=augmenter_SMOD, augment="SMOD", save_augmented=True, phases='in_ex')
-            
-            
-        elif args.augmentation == 'gryds':
-            augmenter_gryds = AUG.Augmentation_gryds(args)
-            train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
-                                        augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
-            
-    val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
-
-    print("Training dataset size: ", len(train_dataset))
     
-    train_dataset.adjust_shape(multiple_of=32)
-    val_dataset.adjust_shape(multiple_of=32)
     if args.overfit:
         train_dataset.overfit_one(i=0)
         val_dataset = train_dataset

@@ -229,7 +229,7 @@ class Dataset(torch.utils.data.Dataset):
             return moving_t, fixed_t
             
 class DatasetLung(Dataset):
-    def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, version="2.1D", phases='in_ex'):
+    def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, version="", phases='in_ex'):
         super().__init__(train_val_test, augmenter, augment, save_augmented)
         self.set = 'lung'
         self.extension = '.nii.gz'
@@ -504,7 +504,7 @@ class Augmentation_gryds(GrydsPhysicsInformed):
 
 
 class Augmentation_SMOD():
-    def __init__(self, root_data, original_dataset, sigma1, sigma2, num_images=1, plot=False, load_atlas=True):
+    def __init__(self, root_data, original_dataset, sigma1, sigma2, num_images=1, plot=False, load_atlas=False):
         self.root_data = root_data
 
         # image generation parameters
@@ -725,7 +725,8 @@ class Augmentation_SMOD():
             A_new_array = sum(np.asarray(re_registered_set)) / len(np.asarray(re_registered_set)) 
             A_new = itk.image_from_array(A_new_array.astype(np.float32))
             
-            self.plot_registration(An, A_new, np.asarray(An) - np.asarray(A_new), deformation_field, full=False)
+            if self.plot:
+                self.plot_registration(An, A_new, np.asarray(An) - np.asarray(A_new), deformation_field, full=False)
             
             iteration += 1
 
@@ -742,6 +743,9 @@ class Augmentation_SMOD():
     def register_to_atlas(self, method="affine", inverse=True):
         """Generate DVFs from set images registered on atlas image"""
         params_path = self.root_data.replace("data","transform_parameters")
+        if not os.path.exists(params_path):
+            os.makedirs(params_path)
+
         DVFs_list, DVFs_inverse_list, imgs_to_atlas = [], [], []
 
         for i in range(len(self.imgs_inhaled)):
@@ -761,7 +765,7 @@ class Augmentation_SMOD():
                 inverse_image, inverse_transform_parameters = itk.elastix_registration_method(
                     self.imgs_inhaled[i], self.imgs_inhaled[i],
                     parameter_object=parameter_object,
-                    initial_transform_parameter_file_name=params_path+"TransformParameters.0.txt")
+                    initial_transform_parameter_file_name=os.path.join(params_path+"/TransformParameters.0.txt"))
                 
                 inverse_transform_parameters.SetParameter(
                     0, "InitialTransformParametersFileName", "NoInitialTransform")
@@ -859,11 +863,11 @@ class Augmentation_SMOD():
         """
         # (1) Generate or get atlas image
         print("Generating atlas image")
-        if self.load_atlas==True:
+        if self.load_atlas==False:
             self.img_atlas = self.generate_atlas(img_data=self.imgs_inhaled)
         else:
             # Load already generated atlas image
-            img_atlas = nib.load(self.root_data+'atlas/atlasv1.nii.gz')
+            img_atlas = nib.load(os.path.join(self.root_data+'/atlas/atlasv1.nii.gz'))
             img_atlas = img_atlas.get_fdata()
             self.img_atlas = itk.image_from_array(ndi.rotate((img_atlas).astype(np.float32),0)) # itk.itkImagePython.itkImageF3
             if self.plot:

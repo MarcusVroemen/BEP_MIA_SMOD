@@ -7,6 +7,8 @@ from argparse import Namespace
 import neptune
 
 import numpy as np
+# import datetime
+# now = datetime.datetime.now() TIME={now.strftime('%H:%M:%S_%Y-%m-%d')}
 
 def string_2_list(string_list):
     return [int(val) for val in string_list.strip('][').split(', ')]
@@ -28,11 +30,13 @@ def log_descriptives_2_neptune(run, var, values):
 
 def init_neptune(args):
     run = neptune.init_run(project='marcusvroemen/ViT-{}'.format(args.dataset),
-                           source_files=['BEP_MIA_DIR/multi-step-ViT/*.py', 'BEP_MIA_DIR/multi-step-ViT/utils/*.py', 'BEP_MIA_DIR/multi-step-ViT/model/***', 'BEP_MIA_DIR/multi-step-ViT/datasets/*.py', 'BEP_MIA_DIR/multi-step-ViT/evaluation/*.py', 'BEP_MIA_DIR/multi-step-ViT/executor/*.py'],
+                           source_files=['multi-step-ViT/*.py', 'multi-step-ViT/utils/*.py', 'multi-step-ViT/model/***', 'multi-step-ViT/datasets/*.py', 'multi-step-ViT/evaluation/*.py', 'multi-step-ViT/executor/*.py'], #BEP_MIA_DIR
                            api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJlMjhiYTdiYS02ZDk1LTQ3ZWEtYThjMC03MTAzNzg4MGRkZTQifQ==',
                            mode=args.mode_neptune)
     run["parameters"] = vars(args)
     args.run_nr = run['sys/id'].fetch()
+    # run["namespace/field_name"] = f"EPOCHS={args.epochs}-AUG={args.augmentation}"
+
     epoch = 0
     return run, args, epoch
 
