@@ -210,7 +210,6 @@ class Dataset(torch.utils.data.Dataset):
             return moving_t, fixed_t
         
         elif self.augment=="SMOD":
-
             img_artificial_inhaled = self.augmenter.generate_img_artificial(img_base=self.augmenter.imgs_inhaled_to_atlas[i],
                                                                         DVF_components=self.augmenter.DVF_inhaled_components, 
                                                                         sigma=self.augmenter.sigma1, breathing=False)
@@ -233,7 +232,7 @@ class Dataset(torch.utils.data.Dataset):
             return moving_t, fixed_t
             
 class DatasetLung(Dataset):
-    def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, version="", phases='in_ex'):
+    def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, version="2.1D", phases='in_ex'):
         super().__init__(train_val_test, augmenter, augment, save_augmented)
         self.set = 'lung'
         self.extension = '.nii.gz'
@@ -508,23 +507,56 @@ class Augmentation_gryds(GrydsPhysicsInformed):
 
 
 class Augmentation_SMOD():
-    def __init__(self, root_data, original_dataset, sigma1, sigma2, num_images=1, plot=False, load_atlas=False):
+    def __init__(self, root_data, original_dataset, sigma1, sigma2, plot=False, 
+                 load_atlas=True, load_preprocessing=False, save_preprocessing=False):
         self.root_data = root_data
-
         # image generation parameters
         self.sigma1 = sigma1
         self.sigma2 = sigma2
-        self.num_images = num_images    #can generate more artificial images a time #*old should remove
         self.plot = plot                #plot registration and transformation steps
         self.load_atlas = load_atlas    #wheather to generate atlas or load existing one
         # Load train data
         self.imgs_inhaled, self.imgs_exhaled = zip(*[(itk.image_from_array(img_inhaled[0]), itk.image_from_array(img_exhaled[0])) 
                                              for img_inhaled, img_exhaled in original_dataset])
-        # Generate DVF components for inhaled augmentation
-        self.DVF_inhaled_components, self.imgs_inhaled_to_atlas, self.DVFs_to_atlas = self.preprocessing_inhaled()
-        # Generate DVF components for exhaled augmentation
-        self.DVF_exhaled_components = self.preprocessing_exhaled()
+        if load_preprocessing==False:
+            # Generate DVF components for inhaled augmentation
+            self.DVF_inhaled_components, self.imgs_inhaled_to_atlas, self.DVFs_to_atlas = self.preprocessing_inhaled()
+            # Generate DVF components for exhaled augmentation
+            self.DVF_exhaled_components = self.preprocessing_exhaled()
+        
+        # Performing the preprocessing steps are always the same and slow
+        # Therefore a function to load the data once created    
+            if save_preprocessing==True:
+                print("Saving preprocessing data...")
+                if not os.path.exists(self.root_data+'/preprocessing/'):
+                    os.makedirs(self.root_data+'/preprocessing/')
+                # Save the list of NumPy arrays to a file
+                preprocessing=[]
+                preprocessing.append(self.DVF_inhaled_components)
+                preprocessing.append(self.DVF_exhaled_components)
+                np.save(self.root_data+'/preprocessing/DVF_components.npy', preprocessing)
+                
+
+                img_template = nib.load(root_data+'/train/image/case_001/T00.nii.gz')
+                for i, image in enumerate(self.imgs_inhaled_to_atlas):
+                    img_nib = nib.Nifti1Image(image, img_template.affine)
+                    nib.save(img_nib, self.root_data+'/preprocessing/image_to_atlas{}.nii.gz'.format(i))
     
+        else:
+            # Load the list of NumPy arrays from the file
+            print("Loading preprocessing data...")
+            preprocessing = np.load(self.root_data+'/preprocessing/DVF_components.npy', allow_pickle=True)
+            self.DVF_inhaled_components = preprocessing[0]
+            self.DVF_exhaled_components = preprocessing[1]
+            
+            self.imgs_inhaled_to_atlas = []
+            for i in range(len(self.imgs_inhaled)):
+                image = nib.load(self.root_data+'/preprocessing/image_to_atlas{}.nii.gz'.format(i))
+                # image = itk.image_from_array(ndi.rotate((image).astype(np.float32),0))
+                image = itk.image_from_array(ndi.rotate(image.get_fdata(),0))
+                self.imgs_inhaled_to_atlas.append(image)
+        
+        print("Done with augmentation initialization")
 
     # Basic Elastix and Gryds (library) functions
     def registration(self, fixed_image, moving_image, method="rigid", 
@@ -867,11 +899,11 @@ class Augmentation_SMOD():
         """
         # (1) Generate or get atlas image
         print("Generating atlas image")
-        if self.load_atlas==False:
+        if self.load_atlas==True:
             self.img_atlas = self.generate_atlas(img_data=self.imgs_inhaled)
         else:
             # Load already generated atlas image
-            img_atlas = nib.load(os.path.join(self.root_data+'/atlas/atlasv1.nii.gz'))
+            img_atlas = nib.load(self.root_data+'atlas/atlasv1.nii.gz')
             img_atlas = img_atlas.get_fdata()
             self.img_atlas = itk.image_from_array(ndi.rotate((img_atlas).astype(np.float32),0)) # itk.itkImagePython.itkImageF3
             if self.plot:
@@ -965,7 +997,6 @@ if __name__ == '__main__':
     imgs_inhaled, imgs_exhaled = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_original])
 
     #TODO: add non varying data 
-    #TODO: output SMOD zelfde als gryds (tensor op cuda)
     # Gryds
     augmenter_gryds = Augmentation_gryds()
     dataset_synthetic_gryds = DatasetLung(train_val_test='train', version='', root_data=root_data, 
@@ -974,8 +1005,8 @@ if __name__ == '__main__':
 
     # SMOD
     augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
-                                    sigma1=15000, sigma2=1500, num_images=1, 
-                                    plot=False, load_atlas=True)
+                                    sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
+                                    load_preprocessing=True, save_preprocessing=False)
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
     imgs_inhaled_SMOD, imgs_exhaled_SMOD = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_synthetic_SMOD])
@@ -1009,3 +1040,5 @@ if __name__ == '__main__':
         plt.tight_layout()
         fig.show()
 
+
+    

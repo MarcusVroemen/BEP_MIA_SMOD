@@ -11,15 +11,10 @@ from model.utils import save_model, init_model#, set_level_sequential_training_2
 from utils.neptune import init_neptune
 from utils.utils import set_seed
 
-# import augmentation.GRYDS as AG
-# import augmentation.SMOD as AS
 import augmentations as AUG
 
 torch.backends.cudnn.benchmark = True  # speed ups
 
-# import os
-# os.environ["PYDEVD_WARN_EVALUATION_TIMEOUT"] = "100"
-# print(os.environ.get("PYDEVD_WARN_EVALUATION_TIMEOUT"))
 
 base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
 # base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
@@ -70,7 +65,10 @@ print(vars(args))
 set_seed(args.random_seed)
 
 if __name__ == "__main__":
-
+    """ CONFIG NEPTUNE """
+    args.mode = 'train'
+    run, args, epoch = init_neptune(args)
+    
     """ CONFIG DATASET """
     if args.dataset == 'lung':
         if args.augmentation == 'none':
@@ -81,8 +79,8 @@ if __name__ == "__main__":
             print("\nInitializin SMOD\n")
             dataset_original = AUG.DatasetLung(train_val_test='train', version=args.version, root_data=args.root_data, augmenter=None)
             augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
-                                        sigma1=15000, sigma2=1500, num_images=1, 
-                                        plot=False, load_atlas=True)
+                                sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
+                                load_preprocessing=True, save_preprocessing=False)
             train_dataset = DatasetLung(train_val_test='train', version=args.version, root_data=args.root_data, 
                                         augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False)
             print(f"\nSMOD initialized. dataset size={len(train_dataset)}\n")
@@ -95,14 +93,6 @@ if __name__ == "__main__":
     
     train_dataset.adjust_shape(multiple_of=32)
     val_dataset.adjust_shape(multiple_of=32)
-    
-    """ CONFIG NEPTUNE """
-    args.mode = 'train'
-    # If you uncomment the code below and make an account on Neptune you can monitor the progress of your training
-    # Also uncomment the lines starting with "run"  --> for example line 75 "run["dataset/size"] = len(train_dataset)" to actually log something to neptune
-    run, args, epoch = init_neptune(args)
-    # run = None # comment this line and the line below if you uncommented the lines above
-    # epoch = 0
     
     if args.overfit:
         train_dataset.overfit_one(i=0)
