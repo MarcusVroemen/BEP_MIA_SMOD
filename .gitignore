@@ -16,4 +16,5 @@ logs/
 4DCT/data/train/synthetic_dvf_aug/*
 4DCT/data/preprocessing
 HPC/*
+4DCT/data/preprocessing
 .neptune

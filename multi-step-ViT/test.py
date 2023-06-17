@@ -13,10 +13,10 @@ from utils.neptune import re_init_neptune
 # TODO:
 
 torch.backends.cudnn.benchmark = True  # speed ups
+
 base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
-
-
-base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
+# base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
+# base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
 
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - validation script')
@@ -27,17 +27,27 @@ parser.add_argument('--root_output', type=str, metavar='',
                     default=base_path+'multi-step-ViT/output/model_val_metrics', help='') #default='/home/bme001/20210003/projects/J01_VIT/output/model_val_metrics'
 parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', help='dataset')
 
+# MultiStepViT architecture (used in all experiments)
+parser.add_argument('--vit_steps', type=int, metavar='', default=2, help='the number of steps of the MultiStepViT')
+parser.add_argument('--patch_size', type=int, metavar='', default=[8, 4], nargs='+', help='patch size')
+parser.add_argument('--stages', type=int, metavar='', default=[3, 4], nargs='+', help='nr. of stages')
+parser.add_argument('--embed_dim', type=int, metavar='', default=[48, 96], nargs='+', help='embedded dimensions') 
+parser.add_argument('--depths', type=int, metavar='', default=[2,2], nargs='+', help='nr. of MSA blocks')   
+parser.add_argument('--num_heads', type=int, metavar='', default=[4,4], nargs='+',                          
+                    help='nr. of attention heads in the MSA block')
+parser.add_argument('--window_size', type=int, metavar='', default=[2,2], nargs='+', help='window size') 
+
 args = parser.parse_args()
 print(vars(args))
 
 if __name__ == "__main__":
     """ CONFIG NEPTUNE """
-    args.mode = 'val'
+    args.mode = 'test' #!
     run, args, epoch = re_init_neptune(args)
 
     """ CONFIG DATASET """
     if args.dataset == 'lung':
-        val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+        val_dataset = DatasetLung('test', root_data=args.root_data, version=args.version) #!
     val_dataset.adjust_shape(multiple_of=32)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 

@@ -17,13 +17,9 @@ import augmentations as AUG
 
 torch.backends.cudnn.benchmark = True  # speed ups
 
-# import os
-# os.environ["PYDEVD_WARN_EVALUATION_TIMEOUT"] = "100"
-# print(os.environ.get("PYDEVD_WARN_EVALUATION_TIMEOUT"))
-
-# base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
+base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
 # base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
-base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
+# base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
 
 
 """ ARGUMENT PARSER """
@@ -63,9 +59,9 @@ parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', h
 parser.add_argument('-v', '--version', type=str, metavar='', default='', help='preprocessing version')
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
 #* Data augmentation 
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='gryds') 
+parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
+parser.add_argument('-sig1', '--sigma1', type=int, metavar='', default=15000) 
+parser.add_argument('-sig2', '--sigma2', type=int, metavar='', default=1500) 
 
 args = parser.parse_args()
 print(vars(args))
@@ -86,7 +82,7 @@ if __name__ == "__main__":
             # dataset_original = DatasetLung(train_val_test='train', version='', root_data=args.root_data, augmenter=None, phases='in_ex')
             dataset_original = DatasetLung('train', root_data=args.root_data, version=args.version)
             augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
-                                            sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
+                                            sigma1=args.sigma1, sigma2=args.sigma2, plot=False, load_atlas=True, 
                                             load_preprocessing=True, save_preprocessing=False)
             train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
                                             augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
