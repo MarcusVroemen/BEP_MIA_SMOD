@@ -162,7 +162,7 @@ class Dataset(torch.utils.data.Dataset):
         self.fixed_lbl = temp
 
     def __len__(self):
-        if (self.augment==("SMOD+real" or "gryds+real")) and (self.train_val_test=="train"):
+        if (self.augment=="SMOD+real" or self.augment=="gryds+real") and (self.train_val_test=="train"):
             return len(self.fixed_img)*2
         else:
             return len(self.fixed_img)
@@ -175,20 +175,20 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         """Load the image/label into a tensor"""
-        if (self.augment==("SMOD+real" or "gryds+real")) and (self.train_val_test!="val"):
-            if self.augment=="SMOD+real":
-                j=i//2
-                
-                # Get image paths and load images
-                moving_path, fixed_path = self.get_paths(j)
-                moving_np = self.read_image_np(moving_path)
-                fixed_np = self.read_image_np(fixed_path)
+        if (self.augment=="SMOD+real" or self.augment=="gryds+real") and (self.train_val_test=="train"):
+            j=i//2
+            
+            # Get image paths and load images
+            moving_path, fixed_path = self.get_paths(j)
+            moving_np = self.read_image_np(moving_path)
+            fixed_np = self.read_image_np(fixed_path)
 
-                # Transform the arrays into tensors and add an extra dimension for the "channels"
-                moving_t = torch.from_numpy(moving_np).unsqueeze(0)
-                fixed_t = torch.from_numpy(fixed_np).unsqueeze(0)
+            # Transform the arrays into tensors and add an extra dimension for the "channels"
+            moving_t = torch.from_numpy(moving_np).unsqueeze(0)
+            fixed_t = torch.from_numpy(fixed_np).unsqueeze(0)
                 
-                if i%2==1:
+            if i%2==1:
+                if self.augment=="SMOD+real":
                     img_artificial_inhaled = self.augmenter.generate_img_artificial(img_base=self.augmenter.imgs_inhaled_to_atlas[j],
                                                                                 DVF_components=self.augmenter.DVF_inhaled_components, 
                                                                                 sigma=self.augmenter.sigma1, breathing=False)
@@ -199,22 +199,8 @@ class Dataset(torch.utils.data.Dataset):
                     # change 3d np.arrays to 4d torch
                     moving_t = torch.from_numpy(img_artificial_inhaled).unsqueeze(0)
                     fixed_t = torch.from_numpy(img_artificial_exhaled).unsqueeze(0)
-                    
-                return moving_t, fixed_t
-                
-            if self.augment=="gryds+real":
-                j=i//2
-                
-                # Get image paths and load images
-                moving_path, fixed_path = self.get_paths(j)
-                moving_np = self.read_image_np(moving_path)
-                fixed_np = self.read_image_np(fixed_path)
-
-                # Transform the arrays into tensors and add an extra dimension for the "channels"
-                moving_t = torch.from_numpy(moving_np).unsqueeze(0)
-                fixed_t = torch.from_numpy(fixed_np).unsqueeze(0)
-                
-                if i%2==1:
+            
+                elif self.augment=="gryds+real":
                     DVF_augment, DVF_respiratory = self.augmenter.generate_on_the_fly(moving_t)
                     moving_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_augment).squeeze(0)
                     DVF_composed, _ = self.augmenter.composed_transform(DVF_augment, DVF_respiratory)
@@ -222,8 +208,9 @@ class Dataset(torch.utils.data.Dataset):
                     moving_t = moving_t_new
                     fixed_t = fixed_t_new
                     
-                return moving_t, fixed_t
-
+            return moving_t, fixed_t
+            
+                
         else:
             # Get image paths and load images
             moving_path, fixed_path = self.get_paths(i)
@@ -278,7 +265,7 @@ class Dataset(torch.utils.data.Dataset):
         
             
 class DatasetLung(Dataset):
-    def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, version="2.1D", phases='in_ex'):
+    def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, folder_augment=None, version="2.1D", phases='in_ex'):
         super().__init__(train_val_test, augmenter, augment, save_augmented)
         self.set = 'lung'
         self.extension = '.nii.gz'
@@ -286,13 +273,19 @@ class DatasetLung(Dataset):
         self.version = version
         self.phases = phases
         self.organ_list = []
-        # self.img_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/image/***'
-        # self.landmarks_folder = f'{root_data}/LUNG_CT/V{version}_PREPROCESSED/{train_val_test}/landmarks/***'
+
         self.img_folder = f'{root_data}/{train_val_test}/image/***'
         self.landmarks_folder = f'{root_data}/{train_val_test}/landmarks/***'
+        if (folder_augment!=None) and (train_val_test=="train"):
+            self.img_folder = f'{root_data}/{folder_augment}/image/***'
+            print(self.img_folder)
+        else:
+            self.img_folder = f'{root_data}/{train_val_test}/image/***'
+        
         self.init_paths()
-        self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0])
-        # self.inshape = np.array((160,128,160))
+        # self.inshape, self.voxel_spacing = self.get_image_header(self.fixed_img[0]) #!
+        self.inshape = np.array((160,128,160))
+        
 
     def init_paths(self):
         if self.phases == 'in_ex':
