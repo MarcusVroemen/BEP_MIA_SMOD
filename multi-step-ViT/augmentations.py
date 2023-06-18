@@ -1045,6 +1045,7 @@ if __name__ == '__main__':
     dataset_synthetic_gryds_real = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_gryds, augment="gryds+real", save_augmented=False, phases='in_ex')
     imgs_moving_gryds_real, imgs_fixed_gryds_real = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_gryds_real])
+
     # SMOD
     augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
                                     sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
@@ -1059,7 +1060,6 @@ if __name__ == '__main__':
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD+real", save_augmented=False, phases='in_ex')
     imgs_moving_SMOD_real, imgs_fixed_SMOD_real = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_SMOD])
-    
 
     for i in range(len(dataset_original)):
         fig, axs = plt.subplots(3, 3, figsize=(20,20))

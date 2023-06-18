@@ -17,8 +17,9 @@ logs/
 4DCT/data/preprocessing
 HPC/*
 4DCT/data/preprocessing
-4DCT/data/gryds18
-4DCT/data/SMOD18
-4DCT/data/real18+gryds18
-4DCT/data/real18+SMOD18
+
+4DCT/data/gryds
+4DCT/data/SMOD
+4DCT/data/gryds+real
+4DCT/data/SMOD+real
 .neptune
