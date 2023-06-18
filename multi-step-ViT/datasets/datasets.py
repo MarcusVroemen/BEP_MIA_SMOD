@@ -130,8 +130,8 @@ class DatasetLung(Dataset):
 
         # Get all file names inside the data folder
 
-        if self.img_folder_augment!=None:
-            self.img_paths, self.landmarks_paths = glob(self.img_folder)+glob(self.img_folder_augment), glob(self.landmarks_folder)
+        if (self.img_folder_augment!=None) and (self.train_val_test=="train"):
+            self.img_paths, self.landmarks_paths = glob(self.img_folder_augment), glob(self.landmarks_folder)
         else:
             self.img_paths, self.landmarks_paths = glob(self.img_folder), glob(self.landmarks_folder)
         # print(self.img_paths)

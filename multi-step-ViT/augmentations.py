@@ -162,7 +162,10 @@ class Dataset(torch.utils.data.Dataset):
         self.fixed_lbl = temp
 
     def __len__(self):
-        return len(self.fixed_img)
+        if (self.augment==("SMOD+real" or "gryds+real")) and (self.train_val_test=="train"):
+            return len(self.fixed_img)*2
+        else:
+            return len(self.fixed_img)
 
     def save_nifti(self, img, fname):
         if torch.is_tensor(img):
@@ -172,64 +175,107 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         """Load the image/label into a tensor"""
+        if (self.augment==("SMOD+real" or "gryds+real")) and (self.train_val_test!="val"):
+            if self.augment=="SMOD+real":
+                j=i//2
+                
+                # Get image paths and load images
+                moving_path, fixed_path = self.get_paths(j)
+                moving_np = self.read_image_np(moving_path)
+                fixed_np = self.read_image_np(fixed_path)
 
-        # Get image paths and load images
-        moving_path, fixed_path = self.get_paths(i)
-        moving_np = self.read_image_np(moving_path)
-        fixed_np = self.read_image_np(fixed_path)
+                # Transform the arrays into tensors and add an extra dimension for the "channels"
+                moving_t = torch.from_numpy(moving_np).unsqueeze(0)
+                fixed_t = torch.from_numpy(fixed_np).unsqueeze(0)
+                
+                if i%2==1:
+                    img_artificial_inhaled = self.augmenter.generate_img_artificial(img_base=self.augmenter.imgs_inhaled_to_atlas[j],
+                                                                                DVF_components=self.augmenter.DVF_inhaled_components, 
+                                                                                sigma=self.augmenter.sigma1, breathing=False)
+                    
+                    img_artificial_exhaled = self.augmenter.generate_img_artificial(img_base=img_artificial_inhaled,
+                                                                                DVF_components=self.augmenter.DVF_exhaled_components, 
+                                                                                sigma=self.augmenter.sigma2, breathing=True)
+                    # change 3d np.arrays to 4d torch
+                    moving_t = torch.from_numpy(img_artificial_inhaled).unsqueeze(0)
+                    fixed_t = torch.from_numpy(img_artificial_exhaled).unsqueeze(0)
+                    
+                return moving_t, fixed_t
+                
+            if self.augment=="gryds+real":
+                j=i//2
+                
+                # Get image paths and load images
+                moving_path, fixed_path = self.get_paths(j)
+                moving_np = self.read_image_np(moving_path)
+                fixed_np = self.read_image_np(fixed_path)
 
-        # Transform the arrays into tensors and add an extra dimension for the "channels"
-        moving_t = torch.from_numpy(moving_np).unsqueeze(0)
-        fixed_t = torch.from_numpy(fixed_np).unsqueeze(0)
+                # Transform the arrays into tensors and add an extra dimension for the "channels"
+                moving_t = torch.from_numpy(moving_np).unsqueeze(0)
+                fixed_t = torch.from_numpy(fixed_np).unsqueeze(0)
+                
+                if i%2==1:
+                    DVF_augment, DVF_respiratory = self.augmenter.generate_on_the_fly(moving_t)
+                    moving_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_augment).squeeze(0)
+                    DVF_composed, _ = self.augmenter.composed_transform(DVF_augment, DVF_respiratory)
+                    fixed_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_composed).squeeze(0)
+                    moving_t = moving_t_new
+                    fixed_t = fixed_t_new
+                    
+                return moving_t, fixed_t
 
-
-        # Generate DVFs on the fly and apply to original moving image
-        if self.augment=="gryds":
-            DVF_augment, DVF_respiratory = self.augmenter.generate_on_the_fly(moving_t)
-            moving_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_augment).squeeze(0)
-            DVF_composed, _ = self.augmenter.composed_transform(DVF_augment, DVF_respiratory)
-            fixed_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_composed).squeeze(0)
-            moving_t = moving_t_new
-            fixed_t = fixed_t_new
-
-            if self.save_augmented:
-                # Create directories
-                if not os.path.exists(os.path.split(moving_path.replace('image', 'synthetic_dvf_aug'))[0]):
-                    os.makedirs(os.path.split(moving_path.replace('image', 'synthetic_dvf_aug'))[0])
-                if not os.path.exists(os.path.split(moving_path.replace('image', 'synthetic_dvf_resp'))[0]):
-                    os.makedirs(os.path.split(moving_path.replace('image', 'synthetic_dvf_resp'))[0])
-                if not os.path.exists(os.path.split(moving_path.replace('image', 'synthetic_image'))[0]):
-                    os.makedirs(os.path.split(moving_path.replace('image', 'synthetic_image'))[0])
-
-                # Save all niftis
-                self.save_nifti(DVF_augment, moving_path.replace('image', 'synthetic_dvf_aug'))
-                self.save_nifti(DVF_respiratory,moving_path.replace('image', 'synthetic_dvf_resp'))
-                self.save_nifti(moving_t, moving_path.replace('image', 'synthetic_image'))
-                self.save_nifti(fixed_t, fixed_path.replace('image', 'synthetic_image'))
-        
-            return moving_t, fixed_t
-        
-        elif self.augment=="SMOD":
-            img_artificial_inhaled = self.augmenter.generate_img_artificial(img_base=self.augmenter.imgs_inhaled_to_atlas[i],
-                                                                        DVF_components=self.augmenter.DVF_inhaled_components, 
-                                                                        sigma=self.augmenter.sigma1, breathing=False)
-            
-            img_artificial_exhaled = self.augmenter.generate_img_artificial(img_base=img_artificial_inhaled,
-                                                                        DVF_components=self.augmenter.DVF_exhaled_components, 
-                                                                        sigma=self.augmenter.sigma2, breathing=True)
-            
-
-            if self.plot:
-                self.augmenter.plot_data_augmpairs(img_artificial_inhaled, img_artificial_exhaled, title="Artificial inhaled and exhaled images")
-            
-            # change 3d np.arrays to 4d torch
-            img_artificial_inhaled = torch.from_numpy(img_artificial_inhaled).unsqueeze(0)
-            img_artificial_exhaled = torch.from_numpy(img_artificial_exhaled).unsqueeze(0)
-            
-            return img_artificial_inhaled, img_artificial_exhaled
-            
         else:
+            # Get image paths and load images
+            moving_path, fixed_path = self.get_paths(i)
+            moving_np = self.read_image_np(moving_path)
+            fixed_np = self.read_image_np(fixed_path)
+
+            # Transform the arrays into tensors and add an extra dimension for the "channels"
+            moving_t = torch.from_numpy(moving_np).unsqueeze(0)
+            fixed_t = torch.from_numpy(fixed_np).unsqueeze(0)
+            
+            if self.augment=="gryds":
+                DVF_augment, DVF_respiratory = self.augmenter.generate_on_the_fly(moving_t)
+                moving_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_augment).squeeze(0)
+                DVF_composed, _ = self.augmenter.composed_transform(DVF_augment, DVF_respiratory)
+                fixed_t_new = self.augmenter.transformer(src=(moving_t).to("cuda").unsqueeze(0), flow=DVF_composed).squeeze(0)
+                moving_t = moving_t_new
+                fixed_t = fixed_t_new
+
+                if self.save_augmented:
+                    # Create directories
+                    if not os.path.exists(os.path.split(moving_path.replace('image', 'synthetic_dvf_aug'))[0]):
+                        os.makedirs(os.path.split(moving_path.replace('image', 'synthetic_dvf_aug'))[0])
+                    if not os.path.exists(os.path.split(moving_path.replace('image', 'synthetic_dvf_resp'))[0]):
+                        os.makedirs(os.path.split(moving_path.replace('image', 'synthetic_dvf_resp'))[0])
+                    if not os.path.exists(os.path.split(moving_path.replace('image', 'synthetic_image'))[0]):
+                        os.makedirs(os.path.split(moving_path.replace('image', 'synthetic_image'))[0])
+
+                    # Save all niftis
+                    self.save_nifti(DVF_augment, moving_path.replace('image', 'synthetic_dvf_aug'))
+                    self.save_nifti(DVF_respiratory,moving_path.replace('image', 'synthetic_dvf_resp'))
+                    self.save_nifti(moving_t, moving_path.replace('image', 'synthetic_image'))
+                    self.save_nifti(fixed_t, fixed_path.replace('image', 'synthetic_image'))
+            
+            elif self.augment=="SMOD":
+                img_artificial_inhaled = self.augmenter.generate_img_artificial(img_base=self.augmenter.imgs_inhaled_to_atlas[i],
+                                                                            DVF_components=self.augmenter.DVF_inhaled_components, 
+                                                                            sigma=self.augmenter.sigma1, breathing=False)
+                
+                img_artificial_exhaled = self.augmenter.generate_img_artificial(img_base=img_artificial_inhaled,
+                                                                            DVF_components=self.augmenter.DVF_exhaled_components, 
+                                                                            sigma=self.augmenter.sigma2, breathing=True)
+                
+
+                if self.plot:
+                    self.augmenter.plot_data_augmpairs(img_artificial_inhaled, img_artificial_exhaled, title="Artificial inhaled and exhaled images")
+                
+                # change 3d np.arrays to 4d torch
+                moving_t = torch.from_numpy(img_artificial_inhaled).unsqueeze(0)
+                fixed_t = torch.from_numpy(img_artificial_exhaled).unsqueeze(0)
+                
             return moving_t, fixed_t
+        
             
 class DatasetLung(Dataset):
     def __init__(self, train_val_test, root_data, augmenter=None, augment=None, save_augmented=False, version="2.1D", phases='in_ex'):
@@ -991,7 +1037,7 @@ class Augmentation_SMOD():
 
 if __name__ == '__main__':
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
-    root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
+    # root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
 
     # Original data
     dataset_original = DatasetLung(train_val_test='train', version='',
@@ -1002,7 +1048,7 @@ if __name__ == '__main__':
     # Gryds
     augmenter_gryds = Augmentation_gryds()
     dataset_synthetic_gryds = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-                                    augmenter=augmenter_gryds, augment="gryds", save_augmented=False, phases='in_ex')
+                                    augmenter=augmenter_gryds, augment="real+gryds", save_augmented=False, phases='in_ex')
     imgs_inhaled_gryds, imgs_exhaled_gryds = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_synthetic_gryds])
 
     # SMOD
@@ -1010,7 +1056,7 @@ if __name__ == '__main__':
                                     sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
                                     load_preprocessing=True, save_preprocessing=False)
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
-                                    augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
+                                    augmenter=augmenter_SMOD, augment="real+SMOD", save_augmented=False, phases='in_ex')
     imgs_inhaled_SMOD, imgs_exhaled_SMOD = zip(*[(img_inhaled, img_exhaled) for img_inhaled, img_exhaled in dataset_synthetic_SMOD])
     
 

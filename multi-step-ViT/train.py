@@ -58,8 +58,9 @@ parser.add_argument('-bs', '--batch_size', type=int, metavar='', default=1,
 parser.add_argument('-set', '--dataset', type=str, metavar='', default='lung', help='dataset')
 parser.add_argument('-v', '--version', type=str, metavar='', default='', help='preprocessing version')
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
-#* Data augmentation 
+# Data augmentation 
 parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
+parser.add_argument('-var', '--varyingaug', type=str, metavar='', default="False") 
 parser.add_argument('-sig1', '--sigma1', type=int, metavar='', default=15000) 
 parser.add_argument('-sig2', '--sigma2', type=int, metavar='', default=1500) 
 
@@ -74,80 +75,90 @@ if __name__ == "__main__":
 
     """ CONFIG DATASET """
     if args.dataset == 'lung':
-        if args.augmentation == 'none':
-            train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
-            print("Init regular training data: ", len(train_dataset))
+        if args.varyingaug == "False":
+            if args.augmentation == 'none':
+                # args.augmentation = none
+                train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version)
+                print("Init regular training data with size: ", len(train_dataset))
+            else:
+                # args.augmentation = gryds, gryds+real, SMOD, SMOD+real
+                train_dataset = DatasetLung('train', root_data=args.root_data, version=args.version, folder_augment=args.augmentation)
+                print(f"Init fixed training data {args.augmentation} with size: {len(train_dataset)}")
+        
+        elif args.varyingaug == "True":
+            if 'SMOD' in args.augmentation:
+                # args.augmentation = SMOD or SMOD+real
+                dataset_original = DatasetLung('train', root_data=args.root_data, version=args.version)
+                augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
+                                                sigma1=args.sigma1, sigma2=args.sigma2, plot=False, load_atlas=True, 
+                                                load_preprocessing=True, save_preprocessing=False)
+                train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
+                                                augmenter=augmenter_SMOD, augment=args.augmentation, save_augmented=False, phases='in_ex')
+                print(f"Init SMOD training data {args.augmentation} with size: {len(train_dataset)}")
+                
+            elif 'gryds' in args.augmentation:
+                # args.augmentation = gryds or gryds+real
+                augmenter_gryds = AUG.Augmentation_gryds(args)
+                train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
+                                            augmenter=augmenter_gryds, augment=args.augmentation, save_augmented=True, phases='in_ex')
+                print(f"Init gryds* training data {args.augmentation} with size: {len(train_dataset)}")
             
-        elif args.augmentation == 'SMOD':
-            # dataset_original = DatasetLung(train_val_test='train', version='', root_data=args.root_data, augmenter=None, phases='in_ex')
-            dataset_original = DatasetLung('train', root_data=args.root_data, version=args.version)
-            augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
-                                            sigma1=args.sigma1, sigma2=args.sigma2, plot=False, load_atlas=True, 
-                                            load_preprocessing=True, save_preprocessing=False)
-            train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
-                                            augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
-            print("Init SMOD training data: ", len(train_dataset))
             
-        elif args.augmentation == 'gryds':
-            augmenter_gryds = AUG.Augmentation_gryds(args)
-            train_dataset = AUG.DatasetLung(train_val_test='train', version='', root_data=args.root_data, 
-                                        augmenter=augmenter_gryds, augment="gryds", save_augmented=True, phases='in_ex')
-            print("Init gryds* training data: ", len(train_dataset))
             
-    val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
+    # val_dataset = DatasetLung('val', root_data=args.root_data, version=args.version)
     
-    train_dataset.adjust_shape(multiple_of=32)
-    val_dataset.adjust_shape(multiple_of=32)
-    if args.overfit:
-        train_dataset.overfit_one(i=0)
-        val_dataset = train_dataset
-        val_dataset.train_val_test = 'val'
-    run["dataset/size"] = len(train_dataset)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    # train_dataset.adjust_shape(multiple_of=32)
+    # val_dataset.adjust_shape(multiple_of=32)
+    # if args.overfit:
+    #     train_dataset.overfit_one(i=0)
+    #     val_dataset = train_dataset
+    #     val_dataset.train_val_test = 'val'
+    # run["dataset/size"] = len(train_dataset)
+    # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    # val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
-    """ INITIALIZE MODEL """
-    model = init_model(args, img_size=train_dataset.inshape)
-    run["model/trainable_params"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    run["model/architecture"] = model
-    model = model.to(args.device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
-    if args.mode_neptune != 'debug':
-        save_model(model, args, epoch, run)
+    # """ INITIALIZE MODEL """
+    # model = init_model(args, img_size=train_dataset.inshape)
+    # run["model/trainable_params"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    # run["model/architecture"] = model
+    # model = model.to(args.device)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    # if args.mode_neptune != 'debug':
+    #     save_model(model, args, epoch, run)
 
-    """INITIALIZE LOSS FUNCTIONS """
-    if args.similarity_loss == 'ncc':
-        similarity_loss = NCC(args.device)
-    if args.similarity_loss == 'nmi':
-        similarity_loss = GlobalMutualInformationLoss()
-    smooth_loss = Grad(penalty='l2', loss_mult=args.reg_weight)
+    # """INITIALIZE LOSS FUNCTIONS """
+    # if args.similarity_loss == 'ncc':
+    #     similarity_loss = NCC(args.device)
+    # if args.similarity_loss == 'nmi':
+    #     similarity_loss = GlobalMutualInformationLoss()
+    # smooth_loss = Grad(penalty='l2', loss_mult=args.reg_weight)
 
-    """ TRAINING """
-    print('\n----- Training -----')
-    # Baseline losses and metrics before training
-    validate_epoch(model, train_loader, run, args,
-                   similarity_loss, smooth_loss)
-    validate_epoch(model, val_loader, run, args,
-                   similarity_loss, smooth_loss)
+    # """ TRAINING """
+    # print('\n----- Training -----')
+    # # Baseline losses and metrics before training
+    # validate_epoch(model, train_loader, run, args,
+    #                similarity_loss, smooth_loss)
+    # validate_epoch(model, val_loader, run, args,
+    #                similarity_loss, smooth_loss)
 
-    # Train the model for the specified amount of epochs
-    epoch += 1
-    while epoch < args.epochs + 1:
-        print(f'\n[epoch {epoch} / {args.epochs}]')
-        # Train and validate for one epoch
-        train_epoch(model, train_loader, optimizer, run, args,
-                    similarity_loss, smooth_loss)
-        metrics = validate_epoch(model, val_loader, run, args,
-                       similarity_loss, smooth_loss)
-        print(metrics)
-        # Save the model each epoch
-        epoch += 1
-        if args.mode_neptune != 'debug' and epoch % 5 == 0:
-            save_model(model, args, epoch, run)
+    # # Train the model for the specified amount of epochs
+    # epoch += 1
+    # while epoch < args.epochs + 1:
+    #     print(f'\n[epoch {epoch} / {args.epochs}]')
+    #     # Train and validate for one epoch
+    #     train_epoch(model, train_loader, optimizer, run, args,
+    #                 similarity_loss, smooth_loss)
+    #     metrics = validate_epoch(model, val_loader, run, args,
+    #                    similarity_loss, smooth_loss)
+    #     print(metrics)
+    #     # Save the model each epoch
+    #     epoch += 1
+    #     if args.mode_neptune != 'debug' and epoch % 5 == 0:
+    #         save_model(model, args, epoch, run)
 
-    df = pd.DataFrame(metrics)
-    print(df)
-    csv_path = '{}/csv/{}_{}_ep-{:04d}.csv'.format(args.root_output, args.run_nr, args.network, epoch - 1)
-    df.to_csv(csv_path)
-    df.to_pickle(csv_path.replace('csv', 'pkl'))
-    run.stop()
+    # df = pd.DataFrame(metrics)
+    # print(df)
+    # csv_path = '{}/csv/{}_{}_ep-{:04d}.csv'.format(args.root_output, args.run_nr, args.network, epoch - 1)
+    # df.to_csv(csv_path)
+    # df.to_pickle(csv_path.replace('csv', 'pkl'))
+    # run.stop()
