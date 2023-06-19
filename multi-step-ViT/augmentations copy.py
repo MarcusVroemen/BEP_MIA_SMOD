@@ -162,7 +162,7 @@ class Dataset(torch.utils.data.Dataset):
         self.fixed_lbl = temp
 
     def __len__(self):
-        if (self.augment=="SMOD+real" or self.augment=="gryds+real" or self.augment=="SMOD_breath+real") and (self.train_val_test=="train"):
+        if (self.augment=="SMOD+real" or self.augment=="gryds+real") and (self.train_val_test=="train"):
             return len(self.fixed_img)*2
         else:
             return len(self.fixed_img)
@@ -175,7 +175,7 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         """Load the image/label into a tensor"""
-        if (self.augment=="SMOD+real" or self.augment=="gryds+real" or self.augment=="SMOD_breath+real") and (self.train_val_test=="train"):
+        if (self.augment=="SMOD+real" or self.augment=="gryds+real") and (self.train_val_test=="train"):
             j=i//2
             
             # Get image paths and load images
@@ -202,7 +202,7 @@ class Dataset(torch.utils.data.Dataset):
             
                 elif self.augment=="SMOD_breath+real":
                     # Apply augmented breathing motion on original images
-                    img_artificial_inhaled = np.asarray(moving_t[0].to("cpu"))
+                    img_artificial_inhaled = moving_t
                     
                     img_artificial_exhaled = self.augmenter.generate_img_artificial(img_base=img_artificial_inhaled,
                                                                                 DVF_components=self.augmenter.DVF_exhaled_components, 
@@ -275,7 +275,7 @@ class Dataset(torch.utils.data.Dataset):
                 
             elif self.augment=="SMOD_breath":
                 # Apply augmented breathing motion on original images
-                img_artificial_inhaled = np.asarray(moving_t[0].to("cpu"))
+                img_artificial_inhaled = moving_t
                 
                 img_artificial_exhaled = self.augmenter.generate_img_artificial(img_base=img_artificial_inhaled,
                                                                             DVF_components=self.augmenter.DVF_exhaled_components, 
@@ -356,7 +356,7 @@ class DatasetLung(Dataset):
 
 
     def get_case_info(self, i):
-        if (self.augment=="SMOD+real" or self.augment=="gryds+real" or self.augment=="SMOD_breath+real") and (self.train_val_test=="train"):
+        if (self.augment=="SMOD+real" or self.augment=="gryds+real") and (self.train_val_test=="train"):
             j=i//2
         else:
             j=i
@@ -1075,17 +1075,26 @@ if __name__ == '__main__':
                                     augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
     imgs_moving_SMOD, imgs_fixed_SMOD = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_SMOD])
     # SMOD + real
+    augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
+                                    sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
+                                    load_preprocessing=True, save_preprocessing=False)
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD+real", save_augmented=False, phases='in_ex')
     imgs_moving_SMOD_real, imgs_fixed_SMOD_real = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_SMOD])
     # SMOD_breath
+    augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
+                                    sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
+                                    load_preprocessing=True, save_preprocessing=False)
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD_breath", save_augmented=False, phases='in_ex')
-    imgs_moving_SMOD_breath, imgs_fixed_SMOD_breath = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_SMOD])
+    imgs_moving_SMOD, imgs_fixed_SMOD = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_SMOD])
     # SMOD_breath + real
+    augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
+                                    sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
+                                    load_preprocessing=True, save_preprocessing=False)
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD_breath+real", save_augmented=False, phases='in_ex')
-    imgs_moving_SMOD_real_breath, imgs_fixed_SMOD_real_breath = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_SMOD])
+    imgs_moving_SMOD_real, imgs_fixed_SMOD_real = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_SMOD])
 
     for i in range(len(dataset_original)):
         fig, axs = plt.subplots(3, 3, figsize=(20,20))
@@ -1109,27 +1118,6 @@ if __name__ == '__main__':
         axs[2, 1].set_title('inhaled SMOD', fontsize=40)
         axs[2, 2].imshow((np.asarray(imgs_moving_SMOD[i][0].to("cpu") - np.asarray(imgs_fixed_SMOD[i][0].to("cpu"))))[:,64,:], cmap='gray')
         axs[2, 2].set_title('exhales-inhaled SMOD', fontsize=40)
-        for ax in axs.flatten():
-            ax.set_axis_off()
-        plt.tight_layout()
-        fig.show()
-        
-    for i in range(len(dataset_original)):
-        fig, axs = plt.subplots(2,3, figsize=(20,20))
-        plt.suptitle("SMOD with only breath on original image")
-        axs[0,0].imshow(np.asarray(imgs_moving[i][0])[:,64,:], cmap='gray')
-        axs[0,0].set_title('exhaled (moving)', fontsize=40)
-        axs[0, 1].imshow(np.asarray(imgs_fixed[i][0])[:,64,:], cmap='gray')
-        axs[0, 1].set_title('inhaled (fixed)', fontsize=40)
-        axs[0, 2].imshow((np.asarray(imgs_moving[i][0])-np.asarray(imgs_fixed[i][0]))[:,64,:], cmap='gray')
-        axs[0, 2].set_title('exhales-inhaled', fontsize=40)
-        
-        axs[1, 0].imshow(np.asarray(imgs_moving_SMOD_breath[i][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[1, 0].set_title('exhaled SMOD', fontsize=40)
-        axs[1, 1].imshow(np.asarray(imgs_fixed_SMOD_breath[i][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[1, 1].set_title('inhaled SMOD', fontsize=40)
-        axs[1, 2].imshow((np.asarray(imgs_moving_SMOD_breath[i][0].to("cpu") - np.asarray(imgs_fixed_SMOD_breath[i][0].to("cpu"))))[:,64,:], cmap='gray')
-        axs[1, 2].set_title('exhales-inhaled SMOD', fontsize=40)
         for ax in axs.flatten():
             ax.set_axis_off()
         plt.tight_layout()
@@ -1162,7 +1150,5 @@ if __name__ == '__main__':
         write_augmented_data(path=root_data, foldername="SMOD+real", imgs_fixed=imgs_fixed_SMOD_real, imgs_moving=imgs_moving_SMOD_real)
         write_augmented_data(path=root_data, foldername="gryds", imgs_fixed=imgs_fixed_gryds, imgs_moving=imgs_moving_gryds)
         write_augmented_data(path=root_data, foldername="gryds+real", imgs_fixed=imgs_fixed_gryds_real, imgs_moving=imgs_moving_gryds_real)
-        write_augmented_data(path=root_data, foldername="SMODbreath", imgs_fixed=imgs_fixed_SMOD_breath, imgs_moving=imgs_moving_SMOD_breath)
-        write_augmented_data(path=root_data, foldername="SMODbreath+real", imgs_fixed=imgs_fixed_SMOD_real_breath, imgs_moving=imgs_moving_SMOD_real_breath)
 
     

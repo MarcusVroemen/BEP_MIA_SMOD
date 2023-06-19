@@ -60,8 +60,7 @@ parser.add_argument('-v', '--version', type=str, metavar='', default='', help='p
 parser.add_argument('--overfit', action='store_true', help='overfit on 1 image during training')
 # Data augmentation 
 parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='none') 
-# parser.add_argument('-aug', '--augmentation', type=str, metavar='', default='SMOD') 
-parser.add_argument('-var', '--varyingaug', type=bool, metavar='', default=False) 
+parser.add_argument('-cd', '--constant_data', type=str, metavar='', default='yes') 
 parser.add_argument('-sig1', '--sigma1', type=int, metavar='', default=15000) 
 parser.add_argument('-sig2', '--sigma2', type=int, metavar='', default=1500) 
 
@@ -69,6 +68,7 @@ args = parser.parse_args()
 print(vars(args))
 set_seed(args.random_seed)
 
+print(args.constant_data)
 if __name__ == "__main__":
     """ CONFIG NEPTUNE """
     args.mode = 'train'
@@ -76,21 +76,20 @@ if __name__ == "__main__":
 
     """ CONFIG DATASET """
     if args.dataset == 'lung':
-        if args.varyingaug == False:
+        if args.constant_data == "yes":
+        # if True:
             if args.augmentation == 'none':
                 # args.augmentation = none
                 train_dataset = AUG.DatasetLung('train', root_data=args.root_data, version=args.version, augmenter=None)
-                # dataset_original = DatasetLung(train_val_test='train', version='',
-                #                    root_data=root_data, augmenter=None, phases='in_ex')
                 print("Init regular training data with size: ", len(train_dataset))
             else:
                 # args.augmentation = gryds, gryds+real, SMOD, SMOD+real
                 train_dataset = AUG.DatasetLung('train', root_data=args.root_data, version=args.version, folder_augment=args.augmentation)
                 print(f"Init fixed training data {args.augmentation} with size: {len(train_dataset)}")
         
-        elif args.varyingaug == True:
+        elif args.constant_data == "no":
             if 'SMOD' in args.augmentation:
-                # args.augmentation = SMOD or SMOD+real
+                # args.augmentation = SMOD, SMOD+real, SMOD_breath or SMOD_breath+real
                 dataset_original = AUG.DatasetLung('train', root_data=args.root_data, version=args.version)
                 augmenter_SMOD = AUG.Augmentation_SMOD(root_data=args.root_data, original_dataset=dataset_original,
                                                 sigma1=args.sigma1, sigma2=args.sigma2, plot=False, load_atlas=True, 
