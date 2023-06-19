@@ -62,3 +62,35 @@ plt.tight_layout()
 plt.show()
 
 # %%
+# Assuming you have a DataFrame called 'df' and you want to select rows with numbers 122, 144, and 145
+desired_numbers = [250, 251, 253, 254]
+number_labels = {250: 's500', 251: 's1000', 253: 's1500', 254: 's2000'}
+
+
+# Filter the DataFrame to select the desired rows
+filtered_df = df[df['run_nr'].isin(desired_numbers)]# Plotting using seaborn
+
+colors = sns.color_palette("rocket")
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+# Plot 'tre' column on the first subplot
+sns.boxplot(data=filtered_df, x='run_nr', y='tre', ax=axes[0], palette=colors)
+axes[0].set_title('TRE')
+axes[0].set_xlabel('Augmentation')
+axes[0].set_ylabel('tre (mm)')
+axes[0].set_xticklabels([number_labels.get(x, str(x)) for x in filtered_df['run_nr'].unique()])
+
+# Plot 'ssim' column on the second subplot
+sns.boxplot(data=filtered_df, x='run_nr', y='ssim', ax=axes[1], palette=colors)
+axes[1].set_title('SSIM')
+axes[1].set_xlabel('Augmentation')
+axes[1].set_ylabel('ssim')
+axes[1].set_xticklabels([number_labels.get(x, str(x)) for x in filtered_df['run_nr'].unique()])
+
+# Adjust the layout and spacing between subplots
+plt.tight_layout()
+
+# Display the plot
+plt.show()
+# %%
