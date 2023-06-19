@@ -1069,7 +1069,7 @@ if __name__ == '__main__':
 
     # SMOD
     augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
-                                    sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
+                                    sigma1=10000, sigma2=10000, plot=False, load_atlas=True, 
                                     load_preprocessing=True, save_preprocessing=False)
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
@@ -1156,13 +1156,25 @@ if __name__ == '__main__':
         plt.tight_layout()
         fig.show()
     
+    for j in range(5):
+        fig, axs = plt.subplots(1, 3, figsize=(20,20))
+        axs[0].imshow(np.asarray(imgs_moving_gryds_real[j][0].to("cpu"))[:,64,:], cmap='gray')
+        axs[0].set_title('exhaled (moving)', fontsize=40)
+        axs[ 1].imshow(np.asarray(imgs_fixed_gryds_real[j][0].to("cpu"))[:,64,:], cmap='gray')
+        axs[ 1].set_title('inhaled (fixed)', fontsize=40)
+        axs[ 2].imshow((np.asarray(imgs_moving_gryds_real[j][0].to("cpu"))-np.asarray(imgs_fixed_gryds_real[j][0].to("cpu")))[:,64,:], cmap='gray')
+        axs[ 2].set_title('exhales-inhaled', fontsize=40)
+        for ax in axs.flatten():
+            ax.set_axis_off()
+        plt.tight_layout()
+        fig.show()
+    
+    
     save=False
     if save:
         write_augmented_data(path=root_data, foldername="SMOD", imgs_fixed=imgs_fixed_SMOD, imgs_moving=imgs_moving_SMOD)
         write_augmented_data(path=root_data, foldername="SMOD+real", imgs_fixed=imgs_fixed_SMOD_real, imgs_moving=imgs_moving_SMOD_real)
         write_augmented_data(path=root_data, foldername="gryds", imgs_fixed=imgs_fixed_gryds, imgs_moving=imgs_moving_gryds)
         write_augmented_data(path=root_data, foldername="gryds+real", imgs_fixed=imgs_fixed_gryds_real, imgs_moving=imgs_moving_gryds_real)
-        write_augmented_data(path=root_data, foldername="SMODbreath", imgs_fixed=imgs_fixed_SMOD_breath, imgs_moving=imgs_moving_SMOD_breath)
-        write_augmented_data(path=root_data, foldername="SMODbreath+real", imgs_fixed=imgs_fixed_SMOD_real_breath, imgs_moving=imgs_moving_SMOD_real_breath)
 
     
