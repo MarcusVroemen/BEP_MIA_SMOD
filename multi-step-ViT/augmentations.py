@@ -1049,7 +1049,8 @@ def write_augmented_data(path, foldername, imgs_fixed, imgs_moving):
 if __name__ == '__main__':
     root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
     # root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
-
+    set_seed(1000)
+    
     # Original data
     dataset_original = DatasetLung(train_val_test='train', version='',
                                    root_data=root_data, augmenter=None, phases='in_ex')
@@ -1069,7 +1070,7 @@ if __name__ == '__main__':
 
     # SMOD
     augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
-                                    sigma1=10000, sigma2=10000, plot=False, load_atlas=True, 
+                                    sigma1=30000, sigma2=4000, plot=False, load_atlas=True, 
                                     load_preprocessing=True, save_preprocessing=False)
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD", save_augmented=False, phases='in_ex')
@@ -1176,5 +1177,5 @@ if __name__ == '__main__':
         write_augmented_data(path=root_data, foldername="SMOD+real", imgs_fixed=imgs_fixed_SMOD_real, imgs_moving=imgs_moving_SMOD_real)
         write_augmented_data(path=root_data, foldername="gryds", imgs_fixed=imgs_fixed_gryds, imgs_moving=imgs_moving_gryds)
         write_augmented_data(path=root_data, foldername="gryds+real", imgs_fixed=imgs_fixed_gryds_real, imgs_moving=imgs_moving_gryds_real)
-
-    
+        write_augmented_data(path=root_data, foldername="SMOD_breath", imgs_fixed=imgs_fixed_SMOD_breath, imgs_moving=imgs_moving_SMOD_breath)
+        write_augmented_data(path=root_data, foldername="SMOD_breath+real", imgs_fixed=imgs_fixed_SMOD_real_breath, imgs_moving=imgs_moving_SMOD_real_breath)

@@ -33,6 +33,10 @@ import nibabel as nib
 import scipy.ndimage as ndi
 plt.rcParams['image.cmap'] = 'gray'
 
+#! switched inhaled/exhaled. First the exhaled image is generated from the 
+#! original moving images (T00) with DVFaug
+#! Then an inhaled counterpart is generated with DVFinsp
+                
 def set_seed(seed_value, pytorch=True):
     """
     Set seed for deterministic behavior
@@ -257,6 +261,9 @@ class Dataset(torch.utils.data.Dataset):
                     self.save_nifti(fixed_t, fixed_path.replace('image', 'synthetic_image'))
             
             elif self.augment=="SMOD":
+                #! switched inhaled/exhaled. First the exhaled image is generated from the 
+                #! original moving images (T00) with DVFaug
+                #! Then an inhaled counterpart is generated with DVFinsp
                 img_artificial_inhaled = self.augmenter.generate_img_artificial(img_base=self.augmenter.imgs_inhaled_to_atlas[i],
                                                                             DVF_components=self.augmenter.DVF_inhaled_components, 
                                                                             sigma=self.augmenter.sigma1, breathing=False)
@@ -577,6 +584,9 @@ class Augmentation_gryds(GrydsPhysicsInformed):
 class Augmentation_SMOD():
     def __init__(self, root_data, original_dataset, sigma1, sigma2, plot=False, 
                  load_atlas=True, load_preprocessing=False, save_preprocessing=False):
+        #! switched inhaled/exhaled. First the exhaled image is generated from the 
+        #! original moving images (T00) with DVFaug
+        #! Then an inhaled counterpart is generated with DVFinsp
         self.root_data = root_data
         # image generation parameters
         self.sigma1 = sigma1
@@ -1068,6 +1078,9 @@ if __name__ == '__main__':
     imgs_moving_gryds_real, imgs_fixed_gryds_real = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_gryds_real])
 
     # SMOD
+    #! switched inhaled/exhaled. First the exhaled image is generated from the 
+    #! original moving images (T00) with DVFaug
+    #! Then an inhaled counterpart is generated with DVFinsp
     augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
                                     sigma1=15000, sigma2=1500, plot=False, load_atlas=True, 
                                     load_preprocessing=True, save_preprocessing=False)
