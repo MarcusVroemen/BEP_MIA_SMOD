@@ -15,8 +15,8 @@ from utils.neptune import re_init_neptune
 torch.backends.cudnn.benchmark = True  # speed ups
 
 base_path = "/home/bme001/20203531/BEP/BEP_MIA_DIR/BEP_MIA_DIR/"
-# base_path = "C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/"
-# base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/"
+# base_path = "C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_SMOD/"
+
 
 """ ARGUMENT PARSER """
 parser = argparse.ArgumentParser(description='J01_VIT - validation script')

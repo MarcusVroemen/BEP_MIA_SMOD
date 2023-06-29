@@ -1047,8 +1047,7 @@ def write_augmented_data(path, foldername, imgs_fixed, imgs_moving):
 
 
 if __name__ == '__main__':
-    root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_DIR/4DCT/data/'
-    # root_data = 'C:/Users/Quinten Vroemen/Documents/MV_codespace/BEP_MIA_DIR/4DCT/data/'
+    root_data = 'C:/Users/20203531/OneDrive - TU Eindhoven/Y3/Q4/BEP/BEP_MIA_SMOD/4DCT/data/'
     set_seed(1000)
     
     # Original data
@@ -1068,6 +1067,7 @@ if __name__ == '__main__':
                                     augmenter=augmenter_gryds, augment="gryds+real", save_augmented=False, phases='in_ex')
     imgs_moving_gryds_real, imgs_fixed_gryds_real = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_gryds_real])
 
+    #* SMOD_full
     # SMOD
     augmenter_SMOD = Augmentation_SMOD(root_data=root_data, original_dataset=dataset_original,
                                     sigma1=30000, sigma2=4000, plot=False, load_atlas=True, 
@@ -1079,6 +1079,8 @@ if __name__ == '__main__':
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD+real", save_augmented=False, phases='in_ex')
     imgs_moving_SMOD_real, imgs_fixed_SMOD_real = zip(*[(img_moving, img_fixed) for img_moving, img_fixed in dataset_synthetic_SMOD])
+    
+    #* SMOD_insp
     # SMOD_breath
     dataset_synthetic_SMOD = DatasetLung(train_val_test='train', version='', root_data=root_data, 
                                     augmenter=augmenter_SMOD, augment="SMOD_breath", save_augmented=False, phases='in_ex')
@@ -1113,63 +1115,7 @@ if __name__ == '__main__':
         for ax in axs.flatten():
             ax.set_axis_off()
         plt.tight_layout()
-        fig.show()
-        
-    for i in range(len(dataset_original)):
-        fig, axs = plt.subplots(2,3, figsize=(20,20))
-        plt.suptitle("SMOD with only breath on original image")
-        axs[0,0].imshow(np.asarray(imgs_moving[i][0])[:,64,:], cmap='gray')
-        axs[0,0].set_title('exhaled (moving)', fontsize=40)
-        axs[0, 1].imshow(np.asarray(imgs_fixed[i][0])[:,64,:], cmap='gray')
-        axs[0, 1].set_title('inhaled (fixed)', fontsize=40)
-        axs[0, 2].imshow((np.asarray(imgs_moving[i][0])-np.asarray(imgs_fixed[i][0]))[:,64,:], cmap='gray')
-        axs[0, 2].set_title('exhales-inhaled', fontsize=40)
-        
-        axs[1, 0].imshow(np.asarray(imgs_moving_SMOD_breath[i][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[1, 0].set_title('exhaled SMOD', fontsize=40)
-        axs[1, 1].imshow(np.asarray(imgs_fixed_SMOD_breath[i][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[1, 1].set_title('inhaled SMOD', fontsize=40)
-        axs[1, 2].imshow((np.asarray(imgs_moving_SMOD_breath[i][0].to("cpu") - np.asarray(imgs_fixed_SMOD_breath[i][0].to("cpu"))))[:,64,:], cmap='gray')
-        axs[1, 2].set_title('exhales-inhaled SMOD', fontsize=40)
-        for ax in axs.flatten():
-            ax.set_axis_off()
-        plt.tight_layout()
-        fig.show()
-        
-    for j in range(len(dataset_synthetic_gryds_real)):
-        fig, axs = plt.subplots(2, 3, figsize=(20,20))
-        axs[0,0].imshow(np.asarray(imgs_moving_gryds_real[j][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[0,0].set_title('exhaled (moving)', fontsize=40)
-        axs[0, 1].imshow(np.asarray(imgs_fixed_gryds_real[j][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[0, 1].set_title('inhaled (fixed)', fontsize=40)
-        axs[0, 2].imshow((np.asarray(imgs_moving_gryds_real[j][0].to("cpu"))-np.asarray(imgs_fixed_gryds_real[j][0].to("cpu")))[:,64,:], cmap='gray')
-        axs[0, 2].set_title('exhales-inhaled', fontsize=40)
-        
-        axs[1, 0].imshow(np.asarray(imgs_moving_SMOD_real[j][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[1, 0].set_title('exhaled gryds', fontsize=40)
-        axs[1, 1].imshow(np.asarray(imgs_fixed_SMOD_real[j][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[1, 1].set_title('inhaled gryds', fontsize=40)
-        axs[1, 2].imshow((np.asarray(imgs_moving_SMOD_real[j][0].to("cpu")) - np.asarray(imgs_fixed_SMOD_real[j][0].to("cpu")))[:,64,:], cmap='gray')
-        axs[1, 2].set_title('exhaled-inhaled gryds', fontsize=40)
-        
-        for ax in axs.flatten():
-            ax.set_axis_off()
-        plt.tight_layout()
-        fig.show()
-    
-    for j in range(5):
-        fig, axs = plt.subplots(1, 3, figsize=(20,20))
-        axs[0].imshow(np.asarray(imgs_moving_gryds_real[j][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[0].set_title('exhaled (moving)', fontsize=40)
-        axs[ 1].imshow(np.asarray(imgs_fixed_gryds_real[j][0].to("cpu"))[:,64,:], cmap='gray')
-        axs[ 1].set_title('inhaled (fixed)', fontsize=40)
-        axs[ 2].imshow((np.asarray(imgs_moving_gryds_real[j][0].to("cpu"))-np.asarray(imgs_fixed_gryds_real[j][0].to("cpu")))[:,64,:], cmap='gray')
-        axs[ 2].set_title('exhales-inhaled', fontsize=40)
-        for ax in axs.flatten():
-            ax.set_axis_off()
-        plt.tight_layout()
-        fig.show()
-    
+        fig.show() 
     
     save=False
     if save:
