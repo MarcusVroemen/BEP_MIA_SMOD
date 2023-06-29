@@ -31,6 +31,3 @@ To run or contribute to this project, please follow these steps:
 
 ## References
 [1] https://link.springer.com/chapter/10.1007/978-3-030-21949-9_39
-
-## License
-MIT CC0
